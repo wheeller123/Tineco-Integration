@@ -114,7 +114,7 @@ class TinecoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             code = user_input["code"]
             try:
                 result = await self.hass.async_add_executor_job(
-                    self._tineco_client.quick_login_by_email,
+                    self._tineco_client.quick_login_by_account,
                     self._email,
                     self._verify_id,
                     code
@@ -133,7 +133,7 @@ class TinecoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required("code"): str,
             }),
             errors=errors,
-            description_placeholders={"email": self._email},
+            description_placeholders={"account": self._email},
         )
 
     def _create_entry(self):

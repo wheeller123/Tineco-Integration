@@ -69,6 +69,10 @@ class TinecoClient:
         self.IOT_API_BASE = "https://api-ngiot.dc-eu.ww.ecouser.net/api/iot/endpoint/control"
         self.IOT_LOGIN_ENDPOINT = "https://api-base.dc-eu.ww.ecouser.net/api/users/user.do"
 
+    def _is_china_region(self) -> bool:
+        """Return True if the configured region is mainland China."""
+        return self.region.upper() == "CN"
+
     @staticmethod
     def generate_valid_device_id():
         """Generates a random device ID in MD5 format (32 hex chars)."""
@@ -147,7 +151,10 @@ class TinecoClient:
                     _LOGGER.warning(f"Got 10001 (New Device). Interactive mode: {request_code}")
 
                     if request_code:
-                        verify_id = self.send_email_verify_code(email)
+                        if self._is_china_region():
+                            verify_id = self.send_sms_verify_code(email)
+                        else:
+                            verify_id = self.send_email_verify_code(email)
                         if verify_id:
                             # This exception must be caught by config_flow
                             raise TinecoNewDeviceException(verify_id)
@@ -219,6 +226,59 @@ class TinecoClient:
             _LOGGER.error(f"Network error in send_email_verify_code: {e}")
             return None
 
+    def send_sms_verify_code(self, phone: str, area_code: str = "+86") -> Optional[str]:
+        """Request an SMS verification code for CN region; returns verifyId on success."""
+        endpoint = "/user/sendSmsVerifyCode"
+        timestamp = int(time.time() * 1000)
+        request_id = uuid.uuid4().hex
+
+        sign_params = [
+            f"authTimespan={timestamp}", f"authTimeZone={self.AUTH_TIMEZONE}",
+            f"country={self.region}", f"lang={self.language}",
+            "appCode=global_e", f"appVersion={self.APP_VERSION}",
+            f"deviceId={self.DEVICE_ID}", f"channel={self.STORE}",
+            "deviceType=1", f"requestId={request_id}",
+            f"mobile={phone}", f"mobileAreaNo={area_code}",
+            "verifyType=SMS_QUICK_LOGIN"
+        ]
+        sign_params.sort()
+        auth_string = self.AUTH_APPKEY + "".join(sign_params) + self.APP_SECRET
+        auth_sign = self._md5_hash(auth_string)
+
+        base_url = (f"https://qas-gl-{self.region.lower()}-api.tineco.com/v1/private/"
+                    f"{self.region}/{self.language}/{self.DEVICE_ID}/global_e/"
+                    f"{self.APP_VERSION}/{self.STORE}/1{endpoint}")
+
+        query_params = {
+            "authAppkey": self.AUTH_APPKEY, "authSign": auth_sign,
+            "authTimeZone": self.AUTH_TIMEZONE, "authTimespan": timestamp,
+            "requestId": request_id, "mobile": phone,
+            "mobileAreaNo": area_code, "verifyType": "SMS_QUICK_LOGIN"
+        }
+
+        encoded_params = []
+        for k, v in query_params.items():
+            val_str = str(v)
+            val_encoded = (val_str.replace("%", "%25").replace(" ", "%20")
+                           .replace("+", "%2B").replace("/", "%2F").replace("&", "%26"))
+            encoded_params.append(f"{k}={val_encoded}")
+
+        full_url = f"{base_url}?{'&'.join(encoded_params)}"
+
+        try:
+            resp = self.session.get(full_url)
+            js = resp.json()
+            if str(js.get("code")) == "0000":
+                v_id = js.get("data", {}).get("verifyId")
+                _LOGGER.debug(f"SMS code sent. VerifyID: {v_id}")
+                return v_id
+            else:
+                _LOGGER.error(f"Failed to send SMS code: {js}")
+                return None
+        except Exception as e:
+            _LOGGER.error(f"Network error in send_sms_verify_code: {e}")
+            return None
+
     def quick_login_by_email(self, email: str, verify_id: str, verify_code: str) -> Tuple[
         bool, Optional[str], Optional[str]]:
         """Finalize login with OTP."""
@@ -271,6 +331,69 @@ class TinecoClient:
         except Exception as e:
             _LOGGER.error(f"Network error in quick_login_by_email: {e}")
             return False, None, None
+
+    def quick_login_by_mobile(self, phone: str, verify_id: str, verify_code: str,
+                              area_code: str = "+86") -> Tuple[bool, Optional[str], Optional[str]]:
+        """Finalize SMS-based OTP login for CN region."""
+        endpoint = "/user/quickLoginByMobile"
+        timestamp = int(time.time() * 1000)
+        request_id = uuid.uuid4().hex
+
+        sign_params = [
+            f"authTimespan={timestamp}", f"authTimeZone={self.AUTH_TIMEZONE}",
+            f"country={self.region}", f"lang={self.language}",
+            "appCode=global_e", f"appVersion={self.APP_VERSION}",
+            f"deviceId={self.DEVICE_ID}", f"channel={self.STORE}",
+            "deviceType=1", f"requestId={request_id}",
+            f"mobile={phone}", f"mobileAreaNo={area_code}",
+            f"verifyId={verify_id}", f"verifyCode={verify_code}"
+        ]
+        sign_params.sort()
+        auth_string = self.AUTH_APPKEY + "".join(sign_params) + self.APP_SECRET
+        auth_sign = self._md5_hash(auth_string)
+
+        base_url = (f"https://qas-gl-{self.region.lower()}-api.tineco.com/v1/private/"
+                    f"{self.region}/{self.language}/{self.DEVICE_ID}/global_e/"
+                    f"{self.APP_VERSION}/{self.STORE}/1{endpoint}")
+
+        query_params = {
+            "authAppkey": self.AUTH_APPKEY, "authSign": auth_sign,
+            "authTimeZone": self.AUTH_TIMEZONE, "authTimespan": timestamp,
+            "requestId": request_id, "mobile": phone,
+            "mobileAreaNo": area_code, "verifyId": verify_id,
+            "verifyCode": verify_code
+        }
+
+        encoded_params = []
+        for k, v in query_params.items():
+            if v is None:
+                v = ""
+            val_str = str(v)
+            val_encoded = (val_str.replace("%", "%25").replace(" ", "%20")
+                           .replace("+", "%2B").replace("/", "%2F").replace("&", "%26"))
+            encoded_params.append(f"{k}={val_encoded}")
+
+        full_url = f"{base_url}?{'&'.join(encoded_params)}"
+
+        try:
+            resp = self.session.get(full_url)
+            js = resp.json()
+            if str(js.get("code")) == "0000":
+                return self._process_login_success(js)
+            else:
+                _LOGGER.error(f"Mobile OTP verification failed. Msg: {js.get('msg')}")
+                return False, None, None
+        except Exception as e:
+            _LOGGER.error(f"Network error in quick_login_by_mobile: {e}")
+            return False, None, None
+
+    def quick_login_by_account(self, account: str, verify_id: str,
+                               verify_code: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Dispatch OTP completion to mobile or email method based on region."""
+        if self._is_china_region():
+            return self.quick_login_by_mobile(account, verify_id, verify_code)
+        else:
+            return self.quick_login_by_email(account, verify_id, verify_code)
 
     def _process_login_success(self, data_json):
         """Helper function to extract data after success"""

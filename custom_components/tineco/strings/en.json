@@ -5,21 +5,21 @@
         "title": "Tineco IoT Account",
         "description": "Enter your Tineco account credentials. Select the region matching your mobile app registration.",
         "data": {
-          "email": "Email address",
+          "email": "Email or Phone Number",
           "password": "Password",
           "region": "Region (Default: IE)"
         }
       },
       "otp": {
         "title": "Device Verification",
-        "description": "A verification code has been sent to {email}. Please enter the 6-digit code below to authorize this Home Assistant instance.",
+        "description": "A verification code has been sent to {account}. Please enter the 6-digit code below to authorize this Home Assistant instance.",
         "data": {
           "code": "Verification Code"
         }
       }
     },
     "error": {
-      "invalid_auth": "Invalid email or password",
+      "invalid_auth": "Invalid credentials",
       "invalid_code": "Invalid verification code",
       "cannot_connect": "Cannot connect to Tineco servers",
       "unknown": "An unknown error occurred"
