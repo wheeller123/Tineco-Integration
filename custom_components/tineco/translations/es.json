@@ -1,0 +1,91 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Cuenta de Tineco IoT",
+        "description": "Introduce tus credenciales de Tineco. Selecciona la región que coincida con tu registro en la aplicación móvil.",
+        "data": {
+          "email": "Correo electrónico o número de teléfono",
+          "password": "Contraseña",
+          "region": "Región (Por defecto: IE)"
+        }
+      },
+      "otp": {
+        "title": "Verificación del dispositivo",
+        "description": "Se ha enviado un código de verificación a {account}. Introduce el código de 6 dígitos a continuación para autorizar esta instancia de Home Assistant.",
+        "data": {
+          "code": "Código de verificación"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Credenciales inválidas",
+      "invalid_code": "Código de verificación inválido",
+      "cannot_connect": "No se puede conectar con los servidores de Tineco",
+      "unknown": "Ocurrió un error desconocido"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configuración de Tineco",
+        "description": "Configura el intervalo de actualización y las opciones del dispositivo",
+        "data": {
+          "scan_interval": "Intervalo de actualización (segundos)",
+          "region": "Región del servidor"
+        },
+        "data_description": {
+          "scan_interval": "Con qué frecuencia comprobar el estado del dispositivo. Valores más bajos proporcionan actualizaciones más rápidas pero pueden aumentar el uso de la API. Por defecto: 60 segundos.",
+          "region": "La región del servidor utilizada para las peticiones API."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": {
+        "name": "Estado del dispositivo"
+      },
+      "firmware_version": {
+        "name": "Versión del firmware"
+      },
+      "api_version": {
+        "name": "Versión de API"
+      },
+      "model": {
+        "name": "Modelo"
+      },
+      "battery": {
+        "name": "Batería"
+      },
+      "vacuum_status": {
+        "name": "Estado de Aspiradora",
+        "state": {
+          "idle": "Inactivo",
+          "in_operation": "En Operación",
+          "self_cleaning": "Auto Limpieza"
+        }
+      },
+      "waste_water_tank_status": {
+        "name": "Estado del Tanque de Aguas Residuales",
+        "state": {
+          "clean": "Limpio",
+          "dirty": "Sucio"
+        }
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Energía"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "En línea"
+      },
+      "charging": {
+        "name": "Cargando"
+      }
+    }
+  }
+}

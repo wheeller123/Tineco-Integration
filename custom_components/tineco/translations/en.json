@@ -1,0 +1,91 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tineco IoT Account",
+        "description": "Enter your Tineco account credentials. Select the region matching your mobile app registration.",
+        "data": {
+          "email": "Email or Phone Number",
+          "password": "Password",
+          "region": "Region (Default: IE)"
+        }
+      },
+      "otp": {
+        "title": "Device Verification",
+        "description": "A verification code has been sent to {account}. Please enter the 6-digit code below to authorize this Home Assistant instance.",
+        "data": {
+          "code": "Verification Code"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials",
+      "invalid_code": "Invalid verification code",
+      "cannot_connect": "Cannot connect to Tineco servers",
+      "unknown": "An unknown error occurred"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Tineco Settings",
+        "description": "Configure how often to poll device status (30-3600 seconds)",
+        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "region": "Server Region"
+        },
+        "data_description": {
+          "scan_interval": "How often to check device status. Lower values provide faster updates but may increase API usage. Default: 60 seconds.",
+          "region": "The server region used for API requests."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": {
+        "name": "Device Status"
+      },
+      "firmware_version": {
+        "name": "Firmware Version"
+      },
+      "api_version": {
+        "name": "API Version"
+      },
+      "model": {
+        "name": "Model"
+      },
+      "battery": {
+        "name": "Battery"
+      },
+      "vacuum_status": {
+        "name": "Vacuum Status",
+        "state": {
+          "idle": "Idle",
+          "in_operation": "In Operation",
+          "self_cleaning": "Self Cleaning"
+        }
+      },
+      "waste_water_tank_status": {
+        "name": "Waste Water Tank Status",
+        "state": {
+          "clean": "Clean",
+          "dirty": "Dirty"
+        }
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      },
+      "charging": {
+        "name": "Charging"
+      }
+    }
+  }
+}
