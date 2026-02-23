@@ -395,18 +395,10 @@ class TinecoClient:
         else:
             return self.quick_login_by_email(account, verify_id, verify_code)
 
-    def _process_login_success(self, data_json):
-        """Helper function to extract data after success"""
-        d = data_json.get("data", data_json)
-        self.access_token = d.get("accessToken", "")
-        self.uid = d.get("uid", "")
-        print(f"[SUCCESS] Logged in! UID: {self.uid}")
-        return True, self.access_token, self.uid
-
     def _get_auth_code(self) -> bool:
         """Get authCode from /global/auth/getAuthCode endpoint"""
         if not self.uid or not self.access_token:
-            print("[ERROR] REST login required before getting authCode")
+            _LOGGER.error("Tineco: REST login required before getting authCode")
             return False
 
         try:
@@ -440,7 +432,7 @@ class TinecoClient:
                 "authTimespan": timestamp
             }
 
-            print("[INFO] Getting authCode...")
+            _LOGGER.debug("Tineco: requesting authCode from %s", url)
             response = self.session.get(url, params=query_params, timeout=10)
 
             if response.status_code == 200:
@@ -455,27 +447,26 @@ class TinecoClient:
                         self.auth_code = auth_code_data if isinstance(auth_code_data, str) else ""
 
                     if not self.auth_code:
-                        print("[ERROR] authCode not in response")
+                        _LOGGER.error("Tineco: authCode not found in response: %s", data)
                         return False
 
-                    print("[OK] Got authCode!")
-                    print(f"    authCode: {self.auth_code[:20]}...")
+                    _LOGGER.debug("Tineco: authCode obtained successfully")
                     return True
                 else:
-                    print(f"[ERROR] Failed to get authCode: {data.get('msg', 'Unknown error')}")
+                    _LOGGER.error("Tineco: failed to get authCode — code=%s msg=%s", code, data.get('msg'))
                     return False
             else:
-                print(f"[ERROR] HTTP Error: {response.status_code}")
+                _LOGGER.error("Tineco: _get_auth_code HTTP error %s", response.status_code)
                 return False
 
         except Exception as e:
-            print(f"[ERROR] Error getting authCode: {str(e)}")
+            _LOGGER.error("Tineco: exception in _get_auth_code: %s", e)
             return False
 
     def _iot_login(self) -> bool:
         """Login to IoT service to get token and resource for device list API"""
         if not self.uid or not self.auth_code:
-            print("[ERROR] REST login and authCode required before IoT login")
+            _LOGGER.error("Tineco: REST login and authCode required before IoT login")
             return False
 
         try:
@@ -494,7 +485,7 @@ class TinecoClient:
                 "org": "TEKWW"
             }
 
-            print("[INFO] Performing IoT login...")
+            _LOGGER.debug("Tineco: performing IoT login to %s", self.IOT_LOGIN_ENDPOINT)
             response = self.session.post(self.IOT_LOGIN_ENDPOINT, json=payload, timeout=10)
 
             if response.status_code == 200:
@@ -508,38 +499,36 @@ class TinecoClient:
                     if "userId" in data:
                         self.uid = data.get("userId")
 
-                    print("[OK] IoT login successful!")
-                    print(f"    IoT Token: {self.iot_token[:20]}...")
-                    print(f"    IoT Resource: {self.iot_resource}")
+                    _LOGGER.debug("Tineco: IoT login successful, resource=%s", self.iot_resource)
                     return True
                 else:
                     error = data.get("error", "Unknown error")
-                    print(f"[ERROR] IoT login failed: {error}")
+                    _LOGGER.error("Tineco: IoT login failed — result=%s error=%s", result, error)
                     return False
             else:
-                print(f"[ERROR] IoT login HTTP error: {response.status_code}")
+                _LOGGER.error("Tineco: IoT login HTTP error %s", response.status_code)
                 return False
 
         except Exception as e:
-            print(f"[ERROR] IoT login error: {str(e)}")
+            _LOGGER.error("Tineco: exception in _iot_login: %s", e)
             return False
 
     def get_devices(self) -> Optional[Dict]:
         """Get list of devices for the logged-in user"""
         if not self.access_token or not self.uid:
-            print("[ERROR] Not logged in. Call login() first.")
+            _LOGGER.error("Tineco: get_devices called before login")
             return None
 
         if not self.auth_code:
-            print("[INFO] Getting authCode for device access...")
+            _LOGGER.debug("Tineco: fetching authCode for device access")
             if not self._get_auth_code():
-                print("[ERROR] Failed to get authCode")
+                _LOGGER.error("Tineco: failed to obtain authCode — cannot fetch device list")
                 return None
 
         if not self.iot_token:
-            print("[INFO] Performing IoT login to get device credentials...")
+            _LOGGER.debug("Tineco: performing IoT login for device credentials")
             if not self._iot_login():
-                print("[ERROR] IoT login failed, cannot get device list")
+                _LOGGER.error("Tineco: IoT login failed — cannot fetch device list")
                 return None
 
         try:
@@ -585,7 +574,7 @@ class TinecoClient:
                 "refresh": "false"
             }
 
-            print("[INFO] Fetching device list...")
+            _LOGGER.debug("Tineco: fetching device list from %s", url)
             response = self.session.get(url, params=query_params, timeout=10)
 
             if response.status_code == 200:
@@ -597,28 +586,25 @@ class TinecoClient:
                     else:
                         self.device_list = payload if isinstance(payload, list) else []
 
-                    print(f"[OK] Found {len(self.device_list)} device(s)")
-                    for device in self.device_list:
-                        device_name = device.get('deviceName', device.get('name', 'Unknown'))
-                        device_id = device.get('deviceId', device.get('id', 'Unknown'))
-                        print(f"    - {device_name} ({device_id})")
+                    _LOGGER.debug("Tineco: found %d device(s)", len(self.device_list))
                     return data
                 else:
-                    print(f"[ERROR] Failed to get devices: {data.get('msg', data.get('message', 'Unknown error'))}")
+                    _LOGGER.error("Tineco: device list API error — code=%s msg=%s",
+                                  data.get("code"), data.get('msg', data.get('message')))
                     return None
             else:
-                print(f"[ERROR] HTTP Error: {response.status_code}")
+                _LOGGER.error("Tineco: get_devices HTTP error %s", response.status_code)
                 return None
 
         except Exception as e:
-            print(f"[ERROR] Error getting devices: {str(e)}")
+            _LOGGER.error("Tineco: exception in get_devices: %s", e)
             return None
 
     def get_device_status(self, device_id: str, device_class: str = "",
                           device_resource: str = "", session_id: str = "") -> Optional[Dict]:
         """Get device status from IoT API"""
         if not self.access_token:
-            print("[ERROR] Not logged in. Call login() first.")
+            _LOGGER.error("Tineco: get_device_status called before login")
             return None
 
         try:
@@ -647,14 +633,13 @@ class TinecoClient:
                 "X-ECO-REQUEST-ID": session_id
             }
 
-            print(f"[INFO] Querying device {device_id}...")
+            _LOGGER.debug("Tineco: querying device status for %s", device_id)
             response = self.session.post(self.IOT_API_BASE, params=params, headers=headers, timeout=10)
 
             ngiot_ret = response.headers.get("X-NGIOT-RET", "")
 
             if response.status_code == 200:
                 if ngiot_ret == "ok":
-                    print("[OK] IoT endpoint returned success")
                     if response.text:
                         try:
                             return response.json()
@@ -668,17 +653,16 @@ class TinecoClient:
                             data = response.json()
                             if isinstance(data, dict) and (
                                     "code" in data and data.get("code") == "0000" or "payload" in data):
-                                print("[OK] Device status retrieved successfully")
                                 return data
                         except Exception:
                             pass
                     return None
             else:
-                print(f"[ERROR] HTTP Error: {response.status_code}")
+                _LOGGER.error("Tineco: get_device_status HTTP error %s", response.status_code)
                 return None
 
         except Exception as e:
-            print(f"[ERROR] Error getting device status: {str(e)}")
+            _LOGGER.error("Tineco: exception in get_device_status: %s", e)
             return None
 
     def _send_iot_query(self, device_id: str, action: str,
@@ -686,7 +670,7 @@ class TinecoClient:
                         session_id: str = "") -> Optional[Dict]:
         """Internal method to send IoT query actions"""
         if not self.access_token:
-            print("[ERROR] Not logged in. Call login() first.")
+            _LOGGER.error("Tineco: _send_iot_query called before login")
             return None
 
         try:
@@ -715,14 +699,13 @@ class TinecoClient:
                 "X-ECO-REQUEST-ID": session_id
             }
 
-            print(f"[INFO] Querying device with action: {action}")
+            _LOGGER.debug("Tineco: IoT query device=%s action=%s", device_id, action)
             response = self.session.post(self.IOT_API_BASE, params=params, headers=headers, timeout=10)
 
             if response.status_code == 200:
                 ngiot_ret = response.headers.get("X-NGIOT-RET", "")
 
                 if ngiot_ret == "ok":
-                    print(f"[OK] Action '{action}' successful")
                     if response.text:
                         try:
                             return response.json()
@@ -731,14 +714,14 @@ class TinecoClient:
                     else:
                         return {"status": "ok", "action": action}
                 else:
-                    print("[ERROR] Query failed")
+                    _LOGGER.debug("Tineco: IoT query action=%s returned ngiot_ret=%s", action, ngiot_ret)
                     return None
             else:
-                print(f"[ERROR] HTTP Error: {response.status_code}")
+                _LOGGER.error("Tineco: _send_iot_query HTTP error %s for action=%s", response.status_code, action)
                 return None
 
         except Exception as e:
-            print(f"[ERROR] Error in query: {str(e)}")
+            _LOGGER.error("Tineco: exception in _send_iot_query action=%s: %s", action, e)
             return None
 
     def get_controller_info(self, device_id: str, device_class: str = "",
@@ -769,41 +752,36 @@ class TinecoClient:
     def get_complete_device_info(self, device_id: str, device_class: str = "",
                                  device_resource: str = "") -> Dict:
         """Get complete device information by querying all available endpoints"""
-        print(f"\n[INFO] Retrieving complete device information for {device_id}...")
+        _LOGGER.debug("Tineco: retrieving complete device info for %s", device_id)
 
         info = {}
 
         try:
-            print("[INFO] Getting controller info (GCI)...")
             gci = self.get_controller_info(device_id, device_class, device_resource)
             if gci:
                 info['gci'] = gci
 
-            print("[INFO] Getting API version (GAV)...")
             gav = self.get_api_version(device_id, device_class, device_resource)
             if gav:
                 info['gav'] = gav
 
-            print("[INFO] Getting config file (GCF)...")
             gcf = self.get_config_file(device_id, device_class, device_resource)
             if gcf:
                 info['gcf'] = gcf
 
-            print("[INFO] Getting config point (CFP)...")
             cfp = self.get_device_config_point(device_id, device_class, device_resource)
             if cfp:
                 info['cfp'] = cfp
 
-            print("[INFO] Getting device modes (QueryMode)...")
             query_mode = self.query_device_mode(device_id, device_class, device_resource)
             if query_mode:
                 info['query_mode'] = query_mode
 
-            print(f"[OK] Retrieved {len(info)} information sources")
+            _LOGGER.debug("Tineco: retrieved %d info source(s) for %s", len(info), device_id)
             return info
 
         except Exception as e:
-            print(f"[ERROR] Error retrieving complete device info: {str(e)}")
+            _LOGGER.error("Tineco: exception in get_complete_device_info: %s", e)
             return info
 
     def control_device(self, device_id: str, command: Dict,
@@ -811,7 +789,7 @@ class TinecoClient:
             Optional[Dict]:
         """Send control command to device via IoT API"""
         if not self.access_token:
-            print("[ERROR] Not logged in. Call login() first.")
+            _LOGGER.error("Tineco: control_device called before login")
             return None
 
         try:
@@ -840,15 +818,11 @@ class TinecoClient:
                 "X-ECO-REQUEST-ID": session_id
             }
 
-            # Construct full URL for display
-            from urllib.parse import urlencode
-            full_url = f"{self.IOT_API_BASE}?{urlencode(params)}"
-            print(f"[DEBUG] URL: {full_url}")
-            print(f"[DEBUG] Body: {command}")
+            _LOGGER.debug("Tineco: control_device device=%s action=%s command=%s", device_id, action, command)
 
             response = self.session.post(self.IOT_API_BASE, params=params, headers=headers, json=command, timeout=10)
 
-            print(f"[DEBUG] Response: {response.text}")
+            _LOGGER.debug("Tineco: control_device response: %s", response.text)
 
             if response.status_code == 200:
                 ngiot_ret = response.headers.get("X-NGIOT-RET", "")
@@ -870,11 +844,11 @@ class TinecoClient:
                             pass
                     return {"status": "unknown", "ngiot_ret": ngiot_ret}
             else:
-                print(f"[ERROR] HTTP Error: {response.status_code}")
+                _LOGGER.error("Tineco: control_device HTTP error %s", response.status_code)
                 return None
 
         except Exception as e:
-            print(f"[ERROR] Error sending command: {str(e)}")
+            _LOGGER.error("Tineco: exception in control_device: %s", e)
             return None
 
 

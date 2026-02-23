@@ -46,8 +46,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "class": first.get("className", ""),
                     "resource": first.get("resource", ""),
                 }
+            else:
+                _LOGGER.warning(
+                    "Tineco: login succeeded but no devices returned during setup "
+                    "(region=%s). Enable debug logging for custom_components.tineco to see why.",
+                    region
+                )
     except Exception as err:
-        _LOGGER.debug(f"Error initializing Tineco client: {err}")
+        _LOGGER.error("Tineco: exception during setup: %s", err)
 
     # Initialize hass.data structure BEFORE creating coordinator
     hass.data[DOMAIN][entry.entry_id] = {
@@ -75,6 +81,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not stored_device:
             devices = await stored_client.async_get_devices()
             if not devices or not stored_client.devices:
+                _LOGGER.error(
+                    "Tineco: device list is empty (region=%s). "
+                    "Enable debug logging for custom_components.tineco to see the failure point.",
+                    stored.get("region")
+                )
                 raise UpdateFailed("No devices found")
 
             first = stored_client.devices[0]
