@@ -2,36 +2,13 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-## What's New in v2.1.0
+## What's New in v2.2.1
 
-### China Region Phone Number Support
-Chinese Tineco accounts use phone numbers instead of email addresses for login. The integration now supports this:
-
-- The login field is now labelled **"Email or Phone Number"** — Chinese users can enter their phone number directly
-- When region **CN** is selected, the integration automatically routes authentication through Tineco's SMS-based verification endpoints (`/user/sendSmsVerifyCode`, `/user/quickLoginByMobile`) instead of the email endpoints
-- If a new device verification code (OTP) is triggered, Chinese users will receive an **SMS** to their phone number rather than an email
-- All other regions continue to use email-based authentication unchanged
-
-### Bug Fixes
-- Fixed missing `translations/` directory — UI field labels were showing raw key names instead of translated strings
-
----
-
-## What's New in v2.0.1
-
-### New Controls
-| Control | Type | Description |
-|---------|------|-------------|
-| Water Mode: Enabled | Switch | Enable/disable water-only cleaning mode |
-| Floor Brush Light | Switch | Toggle floor brush LED light |
-| Suction Mode: Power | Select | Adjust suction power (120W, 150W) |
-| MAX Mode: Power | Select | Adjust MAX mode power (120W, 150W) |
-| MAX Mode: Spray Volume | Select | Set MAX mode spray level (Rinse, Max) |
-| Water Mode: Power | Select | Adjust water mode power (90W, 120W, 150W) |
-| Water Mode: Spray Volume | Select | Set water mode spray level (Mist, Wet, Medium, Rinse, Max) |
-
-### New Setup
-During the integration setup the user can specify the region e.g IE for Ireland or PL for Poland. This is needed to succesfully authenticate
+### Improved Logging
+- Replaced all `print` statements with structured `_LOGGER` logging throughout the integration
+- Errors now use `_LOGGER.error` for visibility in Home Assistant logs
+- Debug-level messages available when debug logging is enabled for `custom_components.tineco`
+- Added clearer error messages when no devices are found during setup, including the configured region for easier troubleshooting
 
 ## Features
 
