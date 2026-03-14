@@ -2,6 +2,21 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
+## What's New in v2.1.0
+
+### China Region Phone Number Support
+Chinese Tineco accounts use phone numbers instead of email addresses for login. The integration now supports this:
+
+- The login field is now labelled **"Email or Phone Number"** — Chinese users can enter their phone number directly
+- When region **CN** is selected, the integration automatically routes authentication through Tineco's SMS-based verification endpoints (`/user/sendSmsVerifyCode`, `/user/quickLoginByMobile`) instead of the email endpoints
+- If a new device verification code (OTP) is triggered, Chinese users will receive an **SMS** to their phone number rather than an email
+- All other regions continue to use email-based authentication unchanged
+
+### Bug Fixes
+- Fixed missing `translations/` directory — UI field labels were showing raw key names instead of translated strings
+
+---
+
 ## What's New in v2.0.1
 
 ### New Controls
@@ -86,7 +101,7 @@ Note: Ensure your Tineco device is powered on and connected to the app before ad
 1. In Home Assistant, go to **Settings** → **Devices & Services**
 2. Click **Create Integration** (+ button)
 3. Search for "Tineco"
-4. Enter your Tineco account email and password
+4. Enter your Tineco account email (or phone number for CN region) and password
 5. Click **Submit**
 
 ## Usage
@@ -191,7 +206,8 @@ Entities are named with prefixes for easy grouping in the UI:
 
 ### Invalid Authentication Error
 
-- Double-check your email and password
+- Double-check your credentials (email or phone number) and password
+- Chinese users: ensure you are entering your phone number and have selected **CN** as the region
 - Ensure your Tineco account is active
 - Try resetting your Tineco password on the official app
 
