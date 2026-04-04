@@ -1,6 +1,7 @@
 """Sensor platform for Tineco integration."""
 
 import logging
+import re
 from typing import Dict, Optional
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.core import HomeAssistant
@@ -11,6 +12,22 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "tineco"
+
+
+def _extract_values(obj, target_keys):
+    """Recursively extract values for target keys (lowercased) from nested dicts/lists."""
+    result = {}
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            k_lower = k.lower() if isinstance(k, str) else ""
+            if k_lower in target_keys:
+                result[k_lower] = v
+            if isinstance(v, (dict, list, tuple)):
+                result.update(_extract_values(v, target_keys))
+    elif isinstance(obj, (list, tuple)):
+        for item in obj:
+            result.update(_extract_values(item, target_keys))
+    return result
 
 
 async def async_setup_entry(
@@ -59,13 +76,8 @@ class TinecoBaseSensor(CoordinatorEntity, SensorEntity):
             self._attr_name = f"Tineco {sensor_type.replace('_', ' ').title()}"
 
     @property
-    def state(self):
-        """Return the state."""
-        return self._state
-    
-    @property
     def native_value(self):
-        """Return the native value (used by ENUM sensors for translation)."""
+        """Return the native value."""
         return self._state
 
     @property
@@ -134,8 +146,6 @@ class TinecoFirmwareVersionSensor(TinecoBaseSensor):
         """Clean version string by removing special characters."""
         if not version_str:
             return ""
-        # Keep only alphanumeric, dots, dashes, underscores
-        import re
         cleaned = re.sub(r'[^a-zA-Z0-9._-]', '', version_str)
         return cleaned if cleaned else ""
     
@@ -183,11 +193,7 @@ class TinecoAPISensor(TinecoBaseSensor):
                                     _LOGGER.debug(f"Found API version: {api_version} in {endpoint_key}")
                                     return
             
-            # Fallback: use a default version if device is online
-            if info:
-                self._state = "1.0"
-            else:
-                self._state = "Unknown"
+            self._state = "Unknown"
         except Exception as err:
             _LOGGER.error(f"Error parsing API version: {err}", exc_info=True)
             self._state = "Unknown"
@@ -285,16 +291,11 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
 
     def _update_state_from_data(self, info: Dict):
         """Update state from device info.
-        
-        Based on FloorSyscBean from decompiled Tineco app:
-        - wm (work mode): Indicates device activity state
-          wm=0,1,2: idle, wm=3: idle, wm=4: in operation
-        - selfclean_process: Self-cleaning progress
-        
-        States:
-        - idle: Device is idle/standby (includes charging state)
-        - in_operation: Device is actively cleaning
-        - self_cleaning: Device is in self-clean mode
+
+        Based on FloorSyscBean from decompiled Tineco app (CL2349 / Floor One Switch S7):
+        - wm=3: in operation (actively cleaning)
+        - wm=8 + selfclean_process >= 5 (and != 17): self-cleaning
+        - all other wm values: idle (standby, charging, drying, OTA, etc.)
         """
         try:
             # Use gci (Get Controller Info) or cfp (Config Point) for current status
@@ -319,99 +320,53 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
             
         except Exception as err:
             _LOGGER.error(f"Error parsing vacuum status: {err}", exc_info=True)
-            self._state = "unknown"
+            self._state = "idle"
 
     def _parse_vacuum_status(self, payload: Dict) -> Optional[str]:
-        """Parse vacuum status from payload."""
+        """Parse vacuum status from payload.
+
+        Logic mirrors the Tineco app's getDeviceState() for the CL2349 (Floor One Switch S7):
+        - wm=1: standby
+        - wm=2: charging
+        - wm=3: running (in_operation)
+        - wm=8: self-cleaning ONLY if selfclean_process >= 5 and != 17
+                (selfclean_process 1-4 = pre-clean charging, 17 = post-clean charging)
+        - wm=9: OTA update (idle)
+        - wm=13: drying (idle)
+        - other wm values: standby (idle)
+        """
         if not isinstance(payload, dict):
             return None
-        
-        # Check all nested dictionaries
-        def extract_values(obj, target_keys):
-            result = {}
-            if isinstance(obj, dict):
-                for k, v in obj.items():
-                    k_lower = k.lower() if isinstance(k, str) else ""
-                    if k_lower in target_keys:
-                        result[k_lower] = v
-                    if isinstance(v, (dict, list, tuple)):
-                        result.update(extract_values(v, target_keys))
-            elif isinstance(obj, (list, tuple)):
-                for item in obj:
-                    result.update(extract_values(item, target_keys))
-            return result
-        
-        # Extract relevant fields for status detection
-        # wm: work mode (8 = self-cleaning)
-        # scm: self-clean mode
-        # scs: self-clean state  
-        # selfclean_process: self-clean process indicator
-        # station: station status
-        fields = extract_values(payload, ["wm", "selfclean_process", "station", "scm", "scs"])
-        
+
+        fields = _extract_values(payload, ["wm", "selfclean_process"])
+
         wm = fields.get("wm")
         selfclean_process = fields.get("selfclean_process")
-        station = fields.get("station")
-        scm = fields.get("scm")
-        scs = fields.get("scs")
-        
-        # Priority 1: Check work mode 8 (wm=8 = self-cleaning)
-        # This is the primary indicator used by the Tineco app
-        if wm is not None:
+
+        if wm is None:
+            return None
+
+        try:
+            work_mode = int(wm)
+        except (ValueError, TypeError):
+            return None
+
+        if work_mode == 3:
+            return "in_operation"
+
+        if work_mode == 8:
+            # wm=8 is the self-clean mode, but only active if selfclean_process >= 5
+            # Values < 5 indicate pre-clean charging; value 17 indicates post-clean charging
             try:
-                work_mode = int(wm)
-                if work_mode == 8:
-                    return "self_cleaning"
+                process = int(selfclean_process) if selfclean_process is not None else 0
             except (ValueError, TypeError):
-                pass
-        
-        # Priority 2: Check if self-cleaning via selfclean_process > 0
-        if selfclean_process is not None:
-            try:
-                if int(selfclean_process) > 0:
-                    return "self_cleaning"
-            except (ValueError, TypeError):
-                pass
-        
-        # Priority 3: Check self-clean mode (scm) or self-clean state (scs)
-        if scm is not None:
-            try:
-                if int(scm) > 0:
-                    return "self_cleaning"
-            except (ValueError, TypeError):
-                pass
-        
-        if scs is not None:
-            try:
-                if int(scs) > 0:
-                    return "self_cleaning"
-            except (ValueError, TypeError):
-                pass
-        
-        # Priority 4: Check station status for self-cleaning
-        if station is not None:
-            try:
-                station_val = int(station)
-                # station=1: In self-clean mode
-                if station_val == 1:
-                    return "self_cleaning"
-            except (ValueError, TypeError):
-                pass
-        
-        # Priority 5: Check work mode for in_operation vs idle
-        if wm is not None:
-            try:
-                work_mode = int(wm)
-                # wm=3 or wm=4: In operation (actively cleaning)
-                if work_mode in (3, 4):
-                    return "in_operation"
-                # wm=0,1,2,10, etc.: Idle (standby, charging, or docked)
-                else:
-                    return "idle"
-            except (ValueError, TypeError):
-                pass
-        
-        return None
+                process = 0
+            if process >= 5 and process != 17:
+                return "self_cleaning"
+            return "idle"
+
+        # wm=1 (standby), wm=2 (charging), wm=9 (OTA), wm=13 (drying), others → idle
+        return "idle"
     
     @property
     def icon(self):
@@ -431,13 +386,8 @@ class TinecoBatterySensor(TinecoBaseSensor):
         """Initialize."""
         super().__init__(config_entry, "battery", hass, coordinator)
         self._state = "Unknown"
-        # Optional: declare device class and unit
-        try:
-            # Avoid strict imports; set strings to be safe across versions
-            self._attr_device_class = "battery"
-            self._attr_native_unit_of_measurement = "%"
-        except Exception:
-            pass
+        self._attr_device_class = "battery"
+        self._attr_native_unit_of_measurement = "%"
 
     def _update_state_from_data(self, info: Dict):
         """Update state from device info."""
@@ -549,30 +499,14 @@ class TinecoWaterTankSensor(TinecoBaseSensor):
             
         except Exception as err:
             _LOGGER.error(f"Error parsing water tank status: {err}", exc_info=True)
-            self._state = "unknown"
+            self._state = "clean"
 
     def _parse_water_tank_status(self, payload: Dict) -> Optional[str]:
         """Parse waste water tank status from payload."""
         if not isinstance(payload, dict):
             return None
-        
-        def extract_values(obj, target_keys):
-            result = {}
-            if isinstance(obj, dict):
-                for k, v in obj.items():
-                    k_lower = k.lower() if isinstance(k, str) else ""
-                    if k_lower in target_keys:
-                        result[k_lower] = v
-                    if isinstance(v, (dict, list, tuple)):
-                        result.update(extract_values(v, target_keys))
-            elif isinstance(obj, (list, tuple)):
-                for item in obj:
-                    result.update(extract_values(item, target_keys))
-            return result
-        
-        # Extract e1 (waste water tank error) - currently no field found in API
-        # Default to clean since we don't have a reliable field yet
-        fields = extract_values(payload, ["e1", "mdt"])
+
+        fields = _extract_values(payload, ["e1", "mdt"])
         
         # Check e1 field if it exists (might indicate waste tank issue)
         e1 = fields.get("e1")
@@ -603,7 +537,7 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
         super().__init__(config_entry, "fresh_water_tank_status", hass, coordinator)
         self._state = "full"
         self._attr_device_class = SensorDeviceClass.ENUM
-        self._attr_options = ["empty", "low", "full"]
+        self._attr_options = ["empty", "full"]
         self._attr_translation_key = "fresh_water_tank_status"
 
     def _update_state_from_data(self, info: Dict):
@@ -629,29 +563,14 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
             
         except Exception as err:
             _LOGGER.error(f"Error parsing fresh water tank status: {err}", exc_info=True)
-            self._state = "unknown"
+            self._state = "full"
 
     def _parse_fresh_water_status(self, payload: Dict) -> Optional[str]:
         """Parse fresh water tank status from payload."""
         if not isinstance(payload, dict):
             return None
-        
-        def extract_values(obj, target_keys):
-            result = {}
-            if isinstance(obj, dict):
-                for k, v in obj.items():
-                    k_lower = k.lower() if isinstance(k, str) else ""
-                    if k_lower in target_keys:
-                        result[k_lower] = v
-                    if isinstance(v, (dict, list, tuple)):
-                        result.update(extract_values(v, target_keys))
-            elif isinstance(obj, (list, tuple)):
-                for item in obj:
-                    result.update(extract_values(item, target_keys))
-            return result
-        
-        # Extract e2 (fresh water tank error code)
-        fields = extract_values(payload, ["e2"])
+
+        fields = _extract_values(payload, ["e2"])
         
         # Check e2 field: 64 = fresh water tank empty
         e2 = fields.get("e2")
@@ -670,10 +589,7 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
         """Return the icon based on state."""
         if self._state == "empty":
             return "mdi:water-off"
-        elif self._state == "low":
-            return "mdi:water-minus"
-        else:
-            return "mdi:water-check"
+        return "mdi:water-check"
 
 
 class TinecoBrushRollerSensor(TinecoBaseSensor):
@@ -710,30 +626,14 @@ class TinecoBrushRollerSensor(TinecoBaseSensor):
 
         except Exception as err:
             _LOGGER.error(f"Error parsing brush roller status: {err}", exc_info=True)
-            self._state = "unknown"
+            self._state = "normal"
 
     def _parse_brush_roller_status(self, payload: Dict) -> Optional[str]:
         """Parse brush roller status from payload."""
         if not isinstance(payload, dict):
             return None
 
-        def extract_values(obj, target_keys):
-            result = {}
-            if isinstance(obj, dict):
-                for k, v in obj.items():
-                    k_lower = k.lower() if isinstance(k, str) else ""
-                    if k_lower in target_keys:
-                        result[k_lower] = v
-                    if isinstance(v, (dict, list, tuple)):
-                        result.update(extract_values(v, target_keys))
-            elif isinstance(obj, (list, tuple)):
-                for item in obj:
-                    result.update(extract_values(item, target_keys))
-            return result
-
-        # Extract brush roller related fields
-        # br = brush roller status, brs = brush roller speed
-        fields = extract_values(payload, ["br", "brs", "brush_roller", "roller_status"])
+        fields = _extract_values(payload, ["br", "brs", "brush_roller", "roller_status"])
 
         # Check br field for brush roller status
         br = fields.get("br")

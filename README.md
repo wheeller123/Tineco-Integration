@@ -2,13 +2,24 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-## What's New in v2.2.1
+## What's New in v2.2.2
 
-### Improved Logging
+### Bug Fixes
+- **Fixed vacuum status stuck on "Self Cleaning"** — The Floor One Switch S7 (and likely other station-equipped models) would always report `self_cleaning` even when idle or cleaning. The status logic now mirrors the Tineco app: `wm=8` is only treated as self-cleaning when `selfclean_process >= 5` (and not 17). Previously, fields like `station`, `scm`, and `scs` were incorrectly triggering the self-cleaning state.
+- **Fixed invalid ENUM states on error** — Sensor error fallbacks now use valid ENUM options (`idle`, `clean`, `full`, `normal`) instead of `"unknown"`, which would cause Home Assistant warnings.
+- **Removed unreachable "low" option** from fresh water tank sensor (only `empty` and `full` are returned by the API).
+- **Fixed fabricated API version** — The API version sensor no longer defaults to `"1.0"` when no version is found; it correctly shows `"Unknown"`.
+
+### Code Quality
+- Extracted duplicated `extract_values` helper into a single module-level utility
+- Removed redundant `state` property (HA uses `native_value` for `SensorEntity`)
+- Moved `import re` to module top level
+- Removed dead `try/except` around battery sensor attribute assignments
+
+### Previous: v2.2.1
+
 - Replaced all `print` statements with structured `_LOGGER` logging throughout the integration
-- Errors now use `_LOGGER.error` for visibility in Home Assistant logs
-- Debug-level messages available when debug logging is enabled for `custom_components.tineco`
-- Added clearer error messages when no devices are found during setup, including the configured region for easier troubleshooting
+- Added clearer error messages when no devices are found during setup
 
 ## Features
 
@@ -212,7 +223,7 @@ The integration sends coordinated mode commands when changing mode settings:
 ### Key API Fields
 
 - `bp` - Battery percentage (0-100)
-- `wm` - Working mode (0=Idle, 2=Charging, 3/4=In Operation, 8=Docked/Standby, 10=Self-cleaning)
+- `wm` - Working mode (1=Standby, 2=Charging, 3=In Operation, 8=Self-clean mode, 9=OTA, 13=Drying)
 - `e1` - Error code 1 (waste water tank issues)
 - `e2` - Error code 2 (64 = fresh water tank empty)
 - `e3` - Error code 3 (other errors)
