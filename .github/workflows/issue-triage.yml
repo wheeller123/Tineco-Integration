@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       issues: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: anthropics/claude-code-action@v1
