@@ -23,5 +23,6 @@ jobs:
             - Expected vs actual behavior
             - Environment details (Home Assistant version, Tineco device model, integration version)
             - Error messages or relevant logs
+            - Explain to them how to enable debug logging for the integration and where to find the logs.
 
             If the issue already contains sufficient information, do nothing.
