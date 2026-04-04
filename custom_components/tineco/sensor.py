@@ -310,14 +310,15 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
                     payload = info['cfp']
             
             if payload:
+                _LOGGER.debug("Vacuum status: raw payload = %s", payload)
                 status = self._parse_vacuum_status(payload)
                 if status:
                     self._state = status
                     return
-            
+
             # Default to idle if we have data but can't determine status
             self._state = "idle"
-            
+
         except Exception as err:
             _LOGGER.error(f"Error parsing vacuum status: {err}", exc_info=True)
             self._state = "idle"
@@ -343,7 +344,13 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
         wm = fields.get("wm")
         selfclean_process = fields.get("selfclean_process")
 
+        _LOGGER.debug(
+            "Vacuum status raw: wm=%s, selfclean_process=%s, payload_keys=%s",
+            wm, selfclean_process, list(payload.keys()) if isinstance(payload, dict) else "N/A"
+        )
+
         if wm is None:
+            _LOGGER.debug("Vacuum status: wm not found in payload")
             return None
 
         try:
@@ -361,10 +368,13 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
                 process = int(selfclean_process) if selfclean_process is not None else 0
             except (ValueError, TypeError):
                 process = 0
+            _LOGGER.debug("Vacuum status: wm=8, selfclean_process=%s → %s",
+                          process, "self_cleaning" if (process >= 5 and process != 17) else "idle")
             if process >= 5 and process != 17:
                 return "self_cleaning"
             return "idle"
 
+        _LOGGER.debug("Vacuum status: wm=%s → idle", work_mode)
         # wm=1 (standby), wm=2 (charging), wm=9 (OTA), wm=13 (drying), others → idle
         return "idle"
     
@@ -385,7 +395,7 @@ class TinecoBatterySensor(TinecoBaseSensor):
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
         """Initialize."""
         super().__init__(config_entry, "battery", hass, coordinator)
-        self._state = "Unknown"
+        self._state = None
         self._attr_device_class = "battery"
         self._attr_native_unit_of_measurement = "%"
 
@@ -393,14 +403,12 @@ class TinecoBatterySensor(TinecoBaseSensor):
         """Update state from device info."""
         percent = self._extract_battery_percent(info)
         if percent is not None:
-            # clamp and convert to int/string
             try:
-                percent_val = max(0, min(100, int(round(float(percent)))))
-                self._state = str(percent_val)
+                self._state = max(0, min(100, int(round(float(percent)))))
             except Exception:
-                self._state = "Unknown"
+                self._state = None
         else:
-            self._state = "Unknown"
+            self._state = None
 
     def _extract_battery_percent(self, info: Dict):
         """Attempt to find battery percentage across known payloads."""
