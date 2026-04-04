@@ -16,6 +16,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true
+          claude_args: --allowedTools "mcp__github__*,Read,Glob,Grep"
           prompt: |
             You are a helpful issue triage bot for the Tineco HACS Integration project.
             Analyze this newly opened issue. If it is missing any of the following,
