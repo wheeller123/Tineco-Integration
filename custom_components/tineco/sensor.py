@@ -362,14 +362,20 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
             return "in_operation"
 
         if work_mode == 8:
-            # wm=8 is the self-clean mode, but only active if selfclean_process >= 5
-            # Values < 5 indicate pre-clean charging; value 17 indicates post-clean charging
+            # wm=8 = self-clean mode.
+            # If selfclean_process is present (station-equipped models like CL2349 Switch S7):
+            #   process >= 5 (and != 17) = actively self-cleaning
+            #   process < 5 or == 17 = pre/post-clean charging → idle
+            # If selfclean_process is absent (e.g. S7 Flashdry): wm=8 alone means self-cleaning
+            if selfclean_process is None:
+                _LOGGER.debug("Vacuum status: wm=8, no selfclean_process → self_cleaning")
+                return "self_cleaning"
             try:
-                process = int(selfclean_process) if selfclean_process is not None else 0
+                process = int(selfclean_process)
             except (ValueError, TypeError):
                 process = 0
-            _LOGGER.debug("Vacuum status: wm=8, selfclean_process=%s → %s",
-                          process, "self_cleaning" if (process >= 5 and process != 17) else "idle")
+            result = "self_cleaning" if (process >= 5 and process != 17) else "idle"
+            _LOGGER.debug("Vacuum status: wm=8, selfclean_process=%s → %s", process, result)
             if process >= 5 and process != 17:
                 return "self_cleaning"
             return "idle"
