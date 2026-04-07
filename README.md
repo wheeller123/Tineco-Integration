@@ -2,24 +2,17 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-## What's New in v2.2.2
+## What's New in v2.2.4
 
 ### Bug Fixes
-- **Fixed vacuum status stuck on "Self Cleaning"** — The Floor One Switch S7 (and likely other station-equipped models) would always report `self_cleaning` even when idle or cleaning. The status logic now mirrors the Tineco app: `wm=8` is only treated as self-cleaning when `selfclean_process >= 5` (and not 17). Previously, fields like `station`, `scm`, and `scs` were incorrectly triggering the self-cleaning state.
-- **Fixed invalid ENUM states on error** — Sensor error fallbacks now use valid ENUM options (`idle`, `clean`, `full`, `normal`) instead of `"unknown"`, which would cause Home Assistant warnings.
-- **Removed unreachable "low" option** from fresh water tank sensor (only `empty` and `full` are returned by the API).
-- **Fixed fabricated API version** — The API version sensor no longer defaults to `"1.0"` when no version is found; it correctly shows `"Unknown"`.
+- **Fixed self-cleaning detection for devices without `selfclean_process` field** — The S7 Flashdry GCI response does not include `selfclean_process`; only `wm=8` indicates self-cleaning. The threshold logic now only applies when the field is actually present (station-equipped models like the CL2349 Switch S7). When absent, `wm=8` alone correctly means self-cleaning.
+- **Fixed battery sensor crash on startup** — Battery sensor now uses `None` instead of `"Unknown"` for initial/error states (HA requires numeric values for `device_class="battery"`).
+- **Added vacuum status debug logging** — Raw GCI payload and parsed `wm`/`selfclean_process` values are now logged at debug level for easier diagnosis.
 
-### Code Quality
-- Extracted duplicated `extract_values` helper into a single module-level utility
-- Removed redundant `state` property (HA uses `native_value` for `SensorEntity`)
-- Moved `import re` to module top level
-- Removed dead `try/except` around battery sensor attribute assignments
+### Community Lovelace Card
 
-### Previous: v2.2.1
+A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](https://github.com/MattiaSaiko/lovelace-tineco-card)
 
-- Replaced all `print` statements with structured `_LOGGER` logging throughout the integration
-- Added clearer error messages when no devices are found during setup
 
 ## Features
 
