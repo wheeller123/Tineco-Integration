@@ -2,10 +2,11 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-## What's New in v2.2.5
+## What's New in v2.2.6
 
 ### Bug Fixes
-- **Fixed IoT login failure for non-EU regions** — The IoT endpoints were hardcoded to the EU datacenter (`dc-eu`), causing error code 9002 ("untrusted IP") for users in other regions. The integration now dynamically resolves the correct datacenter (`eu`, `na`, `as`, or `cn`) via Tineco's area-to-DC API, matching the official app's behavior. Falls back to EU if the lookup fails.
+- **Fixed IoT login failure for non-EU regions** — The IoT endpoints were hardcoded to the EU datacenter (`dc-eu`), causing error code 9002 ("untrusted IP") for users in regions like Israel, US, Asia, Australia, etc. The integration now dynamically resolves the correct datacenter (`eu`, `na`, `as`, or `cn`) via Tineco's area-to-DC API, matching the official app's behavior. Falls back to EU if the lookup fails.
+- **Fixed DC resolution response parsing** — The initial v2.2.5 fix checked the wrong response key (`error_code_info` instead of `code`), causing the DC lookup to always fall back to EU.
 
 ### Community Lovelace Card
 

@@ -84,7 +84,7 @@ class TinecoClient:
             response = self.session.get(url, timeout=5)
             if response.status_code == 200:
                 data = response.json()
-                if data.get("error_code_info") == 0:
+                if data.get("code") == 0:
                     dc = data.get("data", {}).get("dc", "")
                     if dc in VALID_DCS:
                         _LOGGER.info("Tineco: resolved IoT datacenter for region %s: %s", self.region, dc)
