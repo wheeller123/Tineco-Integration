@@ -2,12 +2,10 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-## What's New in v2.2.4
+## What's New in v2.2.5
 
 ### Bug Fixes
-- **Fixed self-cleaning detection for devices without `selfclean_process` field** — The S7 Flashdry GCI response does not include `selfclean_process`; only `wm=8` indicates self-cleaning. The threshold logic now only applies when the field is actually present (station-equipped models like the CL2349 Switch S7). When absent, `wm=8` alone correctly means self-cleaning.
-- **Fixed battery sensor crash on startup** — Battery sensor now uses `None` instead of `"Unknown"` for initial/error states (HA requires numeric values for `device_class="battery"`).
-- **Added vacuum status debug logging** — Raw GCI payload and parsed `wm`/`selfclean_process` values are now logged at debug level for easier diagnosis.
+- **Fixed IoT login failure for non-EU regions** — The IoT endpoints were hardcoded to the EU datacenter (`dc-eu`), causing error code 9002 ("untrusted IP") for users in other regions. The integration now dynamically resolves the correct datacenter (`eu`, `na`, `as`, or `cn`) via Tineco's area-to-DC API, matching the official app's behavior. Falls back to EU if the lookup fails.
 
 ### Community Lovelace Card
 

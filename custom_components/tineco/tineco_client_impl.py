@@ -66,12 +66,35 @@ class TinecoClient:
             "User-Agent": "okhttp/3.12.0",
             "Connection": "Keep-Alive"
         })
-        self.IOT_API_BASE = "https://api-ngiot.dc-eu.ww.ecouser.net/api/iot/endpoint/control"
-        self.IOT_LOGIN_ENDPOINT = "https://api-base.dc-eu.ww.ecouser.net/api/users/user.do"
+        dc = self._resolve_iot_datacenter()
+        vendor = "cn" if self._is_china_region() else "ww"
+        self.IOT_API_BASE = f"https://api-ngiot.dc-{dc}.{vendor}.ecouser.net/api/iot/endpoint/control"
+        self.IOT_LOGIN_ENDPOINT = f"https://api-base.dc-{dc}.{vendor}.ecouser.net/api/users/user.do"
 
     def _is_china_region(self) -> bool:
         """Return True if the configured region is mainland China."""
         return self.region.upper() == "CN"
+
+    def _resolve_iot_datacenter(self) -> str:
+        """Resolve the IoT datacenter code for the configured region via Tineco API."""
+        VALID_DCS = {"cn", "as", "na", "eu"}
+        vendor = "cn" if self._is_china_region() else "ww"
+        url = f"https://api-base.robot{vendor}.ecouser.net/api/basis/dc/get-by-area?area={self.region.lower()}"
+        try:
+            response = self.session.get(url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("error_code_info") == 0:
+                    dc = data.get("data", {}).get("dc", "")
+                    if dc in VALID_DCS:
+                        _LOGGER.info("Tineco: resolved IoT datacenter for region %s: %s", self.region, dc)
+                        return dc
+                    _LOGGER.warning("Tineco: unexpected DC value '%s' for region %s, falling back to 'eu'", dc, self.region)
+                    return "eu"
+            _LOGGER.warning("Tineco: DC lookup failed (HTTP %s), falling back to 'eu'", response.status_code)
+        except Exception as e:
+            _LOGGER.warning("Tineco: DC lookup error: %s, falling back to 'eu'", e)
+        return "eu"
 
     @staticmethod
     def generate_valid_device_id():
