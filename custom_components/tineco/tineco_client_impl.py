@@ -4,6 +4,7 @@ Tineco IoT API Client Implementation.
 import json
 import logging
 import requests
+from requests.exceptions import SSLError
 import hashlib
 import time
 import uuid
@@ -66,12 +67,72 @@ class TinecoClient:
             "User-Agent": "okhttp/3.12.0",
             "Connection": "Keep-Alive"
         })
-        self.IOT_API_BASE = "https://api-ngiot.dc-eu.ww.ecouser.net/api/iot/endpoint/control"
-        self.IOT_LOGIN_ENDPOINT = "https://api-base.dc-eu.ww.ecouser.net/api/users/user.do"
+        dc = self._resolve_iot_datacenter()
+        vendor = "cn" if self._is_china_region() else "ww"
+        self.IOT_API_BASE = f"https://api-ngiot.dc-{dc}.{vendor}.ecouser.net/api/iot/endpoint/control"
+        self.IOT_LOGIN_ENDPOINT = f"https://api-base.dc-{dc}.{vendor}.ecouser.net/api/users/user.do"
+        _LOGGER.debug(
+            "Tineco: client init — region=%s, dc=%s, vendor=%s, iot_login=%s",
+            self.region, dc, vendor, self.IOT_LOGIN_ENDPOINT,
+        )
 
     def _is_china_region(self) -> bool:
         """Return True if the configured region is mainland China."""
         return self.region.upper() == "CN"
+
+    # Static region-to-datacenter fallback map (used when API lookup fails)
+    REGION_DC_MAP = {
+        "cn": "cn",
+        "us": "na", "ca": "na", "mx": "na", "pr": "na", "vi": "na",
+        "jp": "as", "kr": "as", "tw": "as", "sg": "as", "my": "as",
+        "au": "as", "nz": "as", "in": "as", "il": "as", "ae": "as",
+        "sa": "as", "th": "as", "ph": "as", "hk": "as", "id": "as",
+        "vn": "as", "kh": "as", "mm": "as", "bd": "as", "pk": "as",
+        "lk": "as", "np": "as", "qa": "as", "kw": "as", "bh": "as",
+        "om": "as", "jo": "as", "lb": "as", "iq": "as",
+    }
+
+    def _resolve_iot_datacenter(self) -> str:
+        """Resolve the IoT datacenter code for the configured region via Tineco API."""
+        VALID_DCS = {"cn", "as", "na", "eu"}
+        vendor = "cn" if self._is_china_region() else "ww"
+        url = f"https://api-base.robot{vendor}.ecouser.net/api/basis/dc/get-by-area?area={self.region.lower()}"
+
+        _LOGGER.debug("Tineco: DC lookup URL: %s", url)
+
+        # Attempt API lookup, retrying without SSL verification on cert errors
+        for attempt, verify_ssl in enumerate((True, False), 1):
+            try:
+                if attempt == 2:
+                    _LOGGER.warning("Tineco: retrying DC lookup without SSL verification")
+                response = self.session.get(url, timeout=5, verify=verify_ssl)
+                _LOGGER.debug("Tineco: DC lookup response (attempt %d): HTTP %s — %s", attempt, response.status_code, response.text[:200])
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("code") == 0:
+                        dc = data.get("data", {}).get("dc", "")
+                        if dc in VALID_DCS:
+                            _LOGGER.info("Tineco: resolved IoT datacenter for region %s: %s", self.region, dc)
+                            return dc
+                        _LOGGER.warning("Tineco: unexpected DC value '%s' for region %s", dc, self.region)
+                        break
+                _LOGGER.warning("Tineco: DC lookup failed (HTTP %s)", response.status_code)
+                break  # non-SSL HTTP error, no point retrying
+            except SSLError as e:
+                _LOGGER.warning("Tineco: DC lookup SSL error: %s", e)
+                if attempt == 2:
+                    break  # both attempts failed
+            except Exception as e:
+                _LOGGER.warning("Tineco: DC lookup error: %s", e)
+                break  # non-SSL error, no point retrying
+
+        # Static fallback based on region geography
+        fallback = self.REGION_DC_MAP.get(self.region.lower(), "eu")
+        _LOGGER.warning(
+            "Tineco: using static DC fallback for region %s: %s",
+            self.region, fallback,
+        )
+        return fallback
 
     @staticmethod
     def generate_valid_device_id():
@@ -485,7 +546,10 @@ class TinecoClient:
                 "org": "TEKWW"
             }
 
-            _LOGGER.debug("Tineco: performing IoT login to %s", self.IOT_LOGIN_ENDPOINT)
+            _LOGGER.debug(
+                "Tineco: performing IoT login to %s (userId=%s, country=%s, org=%s)",
+                self.IOT_LOGIN_ENDPOINT, self.uid, self.region, payload.get("org"),
+            )
             response = self.session.post(self.IOT_LOGIN_ENDPOINT, json=payload, timeout=10)
 
             if response.status_code == 200:
@@ -503,10 +567,14 @@ class TinecoClient:
                     return True
                 else:
                     error = data.get("error", "Unknown error")
-                    _LOGGER.error("Tineco: IoT login failed — result=%s error=%s", result, error)
+                    errno = data.get("errno", "")
+                    _LOGGER.error(
+                        "Tineco: IoT login failed — result=%s error=%s errno=%s full_response=%s",
+                        result, error, errno, response.text[:500],
+                    )
                     return False
             else:
-                _LOGGER.error("Tineco: IoT login HTTP error %s", response.status_code)
+                _LOGGER.error("Tineco: IoT login HTTP error %s — %s", response.status_code, response.text[:300])
                 return False
 
         except Exception as e:
