@@ -34,17 +34,34 @@ class TinecoClient:
     REGION_TIMEZONE_MAP = {
         "IE": "Europe/London",
         "UK": "Europe/London",
+        "GB": "Europe/London",
         "PL": "Europe/Warsaw",
         "DE": "Europe/Berlin",
         "FR": "Europe/Paris",
         "ES": "Europe/Madrid",
         "IT": "Europe/Rome",
         "US": "America/New_York",
+        "CN": "Asia/Shanghai",
+        "HK": "Asia/Hong_Kong",
+        "TW": "Asia/Taipei",
+        "JP": "Asia/Tokyo",
+        "KR": "Asia/Seoul",
+        "SG": "Asia/Singapore",
+        "AU": "Australia/Sydney",
     }
 
-    def __init__(self, device_id: str = None, region: str = "IE", language: str = "EN_US"):
+    # Region to default language mapping (used when caller doesn't pass one)
+    REGION_LANGUAGE_MAP = {
+        "CN": "ZH_CN",
+        "TW": "ZH_TW",
+        "HK": "ZH_HK",
+        "JP": "JA_JP",
+        "KR": "KO_KR",
+    }
+
+    def __init__(self, device_id: str = None, region: str = "IE", language: str = None):
         self.region = region
-        self.language = language
+        self.language = language or self.REGION_LANGUAGE_MAP.get(region.upper(), "EN_US")
 
         if device_id:
             self.DEVICE_ID = device_id
@@ -198,6 +215,12 @@ class TinecoClient:
                 encoded_params.append(f"{k}={val_encoded}")
 
             full_url = f"{base_url}?{'&'.join(encoded_params)}"
+
+            redacted_url = full_url.replace(f"password={password_md5}", "password=<redacted>")
+            _LOGGER.debug(
+                "Tineco: login request — region=%s lang=%s tz=%s channel=%s url=%s",
+                self.region, self.language, self.AUTH_TIMEZONE, self.STORE, redacted_url,
+            )
 
             response = self.session.get(full_url, timeout=10)
 
