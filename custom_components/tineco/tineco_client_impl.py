@@ -71,6 +71,8 @@ class TinecoClient:
         self.APP_VERSION = "1.7.0"
         self.STORE = "google_play"
         self.AUTH_TIMEZONE = self.REGION_TIMEZONE_MAP.get(region, "Europe/London")
+        rest_suffix = "appapi" if self._is_china_region() else "api"
+        self.REST_API_HOST = f"qas-gl-{self.region.lower()}-{rest_suffix}.tineco.com"
 
         self.access_token = ""
         self.uid = ""
@@ -89,8 +91,8 @@ class TinecoClient:
         self.IOT_API_BASE = f"https://api-ngiot.dc-{dc}.{vendor}.ecouser.net/api/iot/endpoint/control"
         self.IOT_LOGIN_ENDPOINT = f"https://api-base.dc-{dc}.{vendor}.ecouser.net/api/users/user.do"
         _LOGGER.debug(
-            "Tineco: client init — region=%s, dc=%s, vendor=%s, iot_login=%s",
-            self.region, dc, vendor, self.IOT_LOGIN_ENDPOINT,
+            "Tineco: client init — region=%s, dc=%s, vendor=%s, rest_host=%s, iot_login=%s",
+            self.region, dc, vendor, self.REST_API_HOST, self.IOT_LOGIN_ENDPOINT,
         )
 
     def _is_china_region(self) -> bool:
@@ -196,7 +198,7 @@ class TinecoClient:
             auth_string = self.AUTH_APPKEY + "".join(sign_params) + self.APP_SECRET
             auth_sign = self._md5_hash(auth_string)
 
-            base_url = (f"https://qas-gl-{self.region.lower()}-api.tineco.com/v1/private/"
+            base_url = (f"https://{self.REST_API_HOST}/v1/private/"
                         f"{self.region}/{self.language}/{self.DEVICE_ID}/global_e/"
                         f"{self.APP_VERSION}/{self.STORE}/1/user/login")
 
@@ -277,7 +279,7 @@ class TinecoClient:
         auth_string = self.AUTH_APPKEY + "".join(sign_params) + self.APP_SECRET
         auth_sign = self._md5_hash(auth_string)
 
-        base_url = (f"https://qas-gl-{self.region.lower()}-api.tineco.com/v1/private/"
+        base_url = (f"https://{self.REST_API_HOST}/v1/private/"
                     f"{self.region}/{self.language}/{self.DEVICE_ID}/global_e/"
                     f"{self.APP_VERSION}/{self.STORE}/1{endpoint}")
 
@@ -329,7 +331,7 @@ class TinecoClient:
         auth_string = self.AUTH_APPKEY + "".join(sign_params) + self.APP_SECRET
         auth_sign = self._md5_hash(auth_string)
 
-        base_url = (f"https://qas-gl-{self.region.lower()}-api.tineco.com/v1/private/"
+        base_url = (f"https://{self.REST_API_HOST}/v1/private/"
                     f"{self.region}/{self.language}/{self.DEVICE_ID}/global_e/"
                     f"{self.APP_VERSION}/{self.STORE}/1{endpoint}")
 
@@ -382,7 +384,7 @@ class TinecoClient:
         auth_string = self.AUTH_APPKEY + "".join(sign_params) + self.APP_SECRET
         auth_sign = self._md5_hash(auth_string)
 
-        base_url = (f"https://qas-gl-{self.region.lower()}-api.tineco.com/v1/private/"
+        base_url = (f"https://{self.REST_API_HOST}/v1/private/"
                     f"{self.region}/{self.language}/{self.DEVICE_ID}/global_e/"
                     f"{self.APP_VERSION}/{self.STORE}/1{endpoint}")
 
@@ -436,7 +438,7 @@ class TinecoClient:
         auth_string = self.AUTH_APPKEY + "".join(sign_params) + self.APP_SECRET
         auth_sign = self._md5_hash(auth_string)
 
-        base_url = (f"https://qas-gl-{self.region.lower()}-api.tineco.com/v1/private/"
+        base_url = (f"https://{self.REST_API_HOST}/v1/private/"
                     f"{self.region}/{self.language}/{self.DEVICE_ID}/global_e/"
                     f"{self.APP_VERSION}/{self.STORE}/1{endpoint}")
 
