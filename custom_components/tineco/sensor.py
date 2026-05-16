@@ -220,7 +220,16 @@ class TinecoModelSensor(TinecoBaseSensor):
             client = stored.get('client')
             if client and hasattr(client, 'devices') and client.devices:
                 device = client.devices[0]
-                
+
+                _LOGGER.debug(
+                    "Tineco model sensor: device candidates — nick=%r productType=%r "
+                    "deviceName=%r model=%r deviceModel=%r name=%r keys=%s",
+                    device.get('nick'), device.get('productType'),
+                    device.get('deviceName'), device.get('model'),
+                    device.get('deviceModel'), device.get('name'),
+                    sorted(device.keys()) if isinstance(device, dict) else None,
+                )
+
                 # Priority: nick (user-set display name) > productType > deviceName > name
                 # Skip fields starting with '0000' as they are device IDs
                 model = (
@@ -235,7 +244,7 @@ class TinecoModelSensor(TinecoBaseSensor):
                     name = device.get('name')
                     if name and not name.startswith('0000'):
                         model = name
-                
+
                 if model and model != "Unknown":
                     self._state = str(model)
                     return
