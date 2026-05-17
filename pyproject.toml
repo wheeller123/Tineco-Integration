@@ -1,8 +1,13 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Don't set asyncio_mode here — pytest-homeassistant-custom-component sets its
-# own mode and overriding it caused autoload conflicts. WS3 tests use the
-# explicit @pytest.mark.asyncio decorator.
+# pytest-homeassistant-custom-component defines ``hass`` as an async fixture
+# but ``enable_custom_integrations`` (which consumes it) is sync. In
+# pytest-asyncio's default STRICT mode the sync consumer receives an
+# unawaited async_generator and trips
+# ``AttributeError: 'async_generator' object has no attribute 'data'``.
+# Auto mode lets pytest-asyncio bridge async fixtures into sync consumers.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
