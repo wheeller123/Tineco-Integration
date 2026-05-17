@@ -204,7 +204,7 @@ Device queries used by the integration:
 
 ## Support
 
-If something isn't working, please open an issue with logs so the cause is visible — guessing from a single error line rarely works.
+If something isn't working, please open an issue with logs attached so the cause is visible.
 
 **How to grab logs:**
 
@@ -213,23 +213,17 @@ If something isn't working, please open an issue with logs so the cause is visib
    ```yaml
    logger:
      default: warning
-     logs:
-       custom_components.tineco: debug
    ```
 
-2. Restart Home Assistant.
+   Restart Home Assistant so the `logger` block is active.
+
+2. Open the Tineco integration: **Settings** → **Devices & Services** → **Tineco** → **Enable debug logging**.
+
 3. Reproduce the problem (e.g. add the integration, toggle a switch, wait for the failing poll).
-4. Open **Settings** → **System** → **Logs** → **Download Full Log**.
 
-**Open the issue here:** https://github.com/wheeller123/Tineco-HACS-Integration/issues
+4. Back on the integration page, click **Disable debug logging**. Home Assistant will prompt you to save the log file — download it.
 
-Please include:
-
-- Home Assistant version, integration version (`2.3.0` etc.), region (`IE` / `US` / `CN` / …) and device model
-- A short description of what you did and what happened
-- The relevant section of the log (scrub anything that looks like a token, account id, or phone number first)
-
-The more context the issue has up front, the faster it can be fixed.
+**Open the issue here:** https://github.com/wheeller123/Tineco-HACS-Integration/issues — attach the log file and include the integration version, region (`IE` / `US` / `CN` / …), device model, and a short description of what you did. Scrub anything that looks like a token, account ID, or phone number before posting.
 
 
 ## Credits
