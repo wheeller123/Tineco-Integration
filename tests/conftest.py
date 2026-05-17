@@ -16,27 +16,18 @@ if str(REPO_ROOT) not in sys.path:
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-# Auto-enable the HA custom-integration loader, but ONLY for tests that
-# actually request the ``hass`` fixture. The plugin's ``enable_custom_integrations``
-# fixture depends transitively on the async ``hass`` fixture; resolving it
-# from a sync autouse without the test owning ``hass`` returns an
-# ``async_generator`` instead of a real HomeAssistant and the plugin crashes
-# with ``'async_generator' object has no attribute 'data'``.
+# NOTE: there is no global ``enable_custom_integrations`` autouse here.
+# That fixture transitively depends on the async ``hass`` fixture, so
+# resolving it from a sync autouse via ``getfixturevalue`` returns an
+# unawaited ``async_generator`` and the plugin then trips
+# ``AttributeError: 'async_generator' object has no attribute 'data'``.
 #
-# This pattern means WS1/WS2 unit tests (sync, no ``hass``) skip the
-# resolution entirely while WS3 integration tests (async, request ``hass``)
-# get custom-integration loading for free without each test having to list
-# the fixture explicitly.
-@pytest.fixture(autouse=True)
-def _auto_enable_custom_integrations(request):
-    if "hass" in request.fixturenames:
-        try:
-            request.getfixturevalue("enable_custom_integrations")
-        except pytest.FixtureLookupError:
-            # Plugin not loaded (e.g. local Windows): WS3 tests self-skip,
-            # so this branch is harmless.
-            pass
-    yield
+# Instead, each WS3 test module (test_config_flow.py, test_integration_setup.py,
+# test_coordinator.py) declares its own module-level autouse fixture that
+# takes ``enable_custom_integrations`` as a *declared dependency* —
+# pytest then resolves the fixture chain in the right order inside an
+# async event loop. WS1/WS2 unit tests don't import that fixture and
+# remain pure-sync.
 
 
 @pytest.fixture

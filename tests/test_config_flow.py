@@ -25,6 +25,15 @@ from homeassistant.core import HomeAssistant
 from custom_components.tineco.const import DOMAIN
 
 
+@pytest.fixture(autouse=True)
+def _enable_custom_integrations(enable_custom_integrations):
+    """Module-scoped autouse declaring the plugin's ``enable_custom_integrations``
+    as a *fixture dependency* (not a runtime lookup). Pytest resolves the
+    chain through async context so ``hass`` is awaited correctly before the
+    plugin tries to access ``hass.data``."""
+    yield
+
+
 @pytest.mark.asyncio
 async def test_invalid_credentials_show_invalid_auth_error(hass: HomeAssistant):
     """A failed login surfaces as ``errors['base'] == 'invalid_auth'`` so the

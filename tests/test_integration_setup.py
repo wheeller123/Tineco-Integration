@@ -25,6 +25,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.tineco.const import DOMAIN
 
 
+@pytest.fixture(autouse=True)
+def _enable_custom_integrations(enable_custom_integrations):
+    """Module-scoped autouse declaring the plugin's ``enable_custom_integrations``
+    as a *fixture dependency* so pytest can resolve the async ``hass`` chain
+    correctly before the plugin accesses ``hass.data``."""
+    yield
+
+
 @pytest.fixture
 def mock_tineco_device_client():
     """Patch the wrapper used by async_setup_entry to avoid live API calls."""
