@@ -2,6 +2,8 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
+Current version: **2.3.0** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models may work with community feedback.
+
 ### Community Lovelace Card
 
 A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](https://github.com/MattiaSaiko/lovelace-tineco-card)
@@ -10,7 +12,7 @@ A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](h
 ## Features
 
 - **Device Discovery**: Automatically discovers Tineco devices in your account
-- **Sensor Entities**: 
+- **Sensor Entities**:
   - Firmware version
   - API version
   - Device model
@@ -27,96 +29,87 @@ A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](h
   - Suction Mode: Power (120W, 150W)
   - MAX Mode: Power (120W, 150W)
   - MAX Mode: Spray Volume (Rinse, Max)
-  - Water Mode: Power (90W, 120W, 150W) - *disabled when Water Mode is off*
-  - Water Mode: Spray Volume (Mist, Wet, Medium, Rinse, Max) - *disabled when Water Mode is off*
+  - Water Mode: Power (90W, 120W, 150W) — *disabled when Water Mode is off*
+  - Water Mode: Spray Volume (Mist, Wet, Medium, Rinse, Max) — *disabled when Water Mode is off*
 - **Binary Sensors**:
   - Online status
   - Charging status
 - **Smart Controls**:
-  - Water Mode controls are automatically disabled (greyed out) when Water Mode is turned off
+  - Water Mode controls automatically grey out when Water Mode is disabled
   - Grouped entity naming for easy organization
-- **Configuration UI**: Easy setup through Home Assistant UI
-- **Multi-language Support**: English and Spanish
-
-### Improvements
-- **Smart Availability**: Water Mode controls automatically grey out when Water Mode is disabled
-- **Grouped Entity Naming**: Related controls are now prefixed (e.g., "Tineco Sound:", "Tineco Water Mode:")
-- **Instant UI Updates**: Control availability updates immediately when toggling Water Mode
-- **Coordinated Mode Commands**: Mode changes now send properly synchronized commands to the device
-- **Renamed Integration**: Changed from "Tineco IoT" to "Tineco" for simplicity
+- **Configuration UI**: Setup through the Home Assistant UI
+- **Multi-region**: Global (`IE`, `US`, …) and China (`CN`) — the integration picks the correct host, org, and country at runtime
+- **Multi-language**: English and Spanish
 
 
 ## Installation
 
 ### Via HACS
-Note: Ensure your Tineco device is powered on and connected to the app before adding the integration
 
-1. Go to **HACS** → **Integrations**
-2. Click the three dots menu → **Custom repositories**
-3. Add: `https://github.com/wheeller123/Tineco-HACS-Integration`
-4. Category: `Integration`
-5. Search for "Tineco"
-6. Click **Install**
-7. Restart Home Assistant
-8. Go to **Settings** → **Devices & Services** → **Add Integration**
-9. Search for "Tineco" and configure
+> Make sure the device is powered on and paired in the Tineco app before adding the integration.
 
-### Manual Installation
+1. Open **HACS** → **Integrations**
+2. Three-dots menu → **Custom repositories**
+3. Add `https://github.com/wheeller123/Tineco-HACS-Integration` with category **Integration**
+4. Search for **Tineco** and install
+5. Restart Home Assistant
+6. **Settings** → **Devices & Services** → **Add Integration** → search for **Tineco**
 
-1. Copy the `custom_components/tineco` folder to your Home Assistant `custom_components` directory
+### Manual installation
+
+1. Copy `custom_components/tineco/` into your Home Assistant `custom_components/` directory
 2. Restart Home Assistant
-3. Go to **Settings** → **Devices & Services** → **Add Integration**
-4. Search for "Tineco" and configure
+3. **Settings** → **Devices & Services** → **Add Integration** → search for **Tineco**
+
 
 ## Configuration
 
-### Via UI (Recommended)
+1. **Settings** → **Devices & Services** → **+ Add Integration**
+2. Search for **Tineco**
+3. Enter your Tineco account email (or phone number for the CN region) and password
+4. Pick the correct region (`CN` for mainland China accounts, otherwise your global region code)
+5. **Submit**
 
-1. In Home Assistant, go to **Settings** → **Devices & Services**
-2. Click **Create Integration** (+ button)
-3. Search for "Tineco"
-4. Enter your Tineco account email (or phone number for CN region) and password
-5. Click **Submit**
 
-## Usage
-
-Once configured, the integration will create the following entities:
+## Entities
 
 ### Sensors
-- `sensor.tineco_firmware_version` - Firmware version
-- `sensor.tineco_api_version` - API version  
-- `sensor.tineco_model` - Device model (e.g., S7 Flashdry)
-- `sensor.tineco_battery` - Battery level percentage
-- `sensor.tineco_vacuum_status` - Current vacuum status (idle, in_operation, self_cleaning, docked_standby)
-- `sensor.tineco_waste_water_tank_status` - Waste water tank status (clean/full)
-- `sensor.tineco_fresh_water_tank_status` - Fresh water tank status (empty/full)
+- `sensor.tineco_firmware_version` — firmware version
+- `sensor.tineco_api_version` — API version
+- `sensor.tineco_model` — device model (e.g. *S7 Flashdry*)
+- `sensor.tineco_battery` — battery level percentage
+- `sensor.tineco_vacuum_status` — `idle`, `in_operation`, `self_cleaning`, `docked_standby`, …
+- `sensor.tineco_waste_water_tank_status` — `clean` / `full`
+- `sensor.tineco_fresh_water_tank_status` — `empty` / `full`
 
 ### Switches
-- `switch.tineco_sound_enabled` - Sound on/off (mute/unmute control)
-- `switch.tineco_water_mode_enabled` - Water-only mode on/off
-- `switch.tineco_floor_brush_light` - Floor brush light on/off
+- `switch.tineco_sound_enabled`
+- `switch.tineco_water_mode_enabled`
+- `switch.tineco_floor_brush_light`
 
 ### Selects
-- `select.tineco_sound_volume_level` - Volume level selection (Low, Medium, High)
-- `select.tineco_suction_mode_power` - Suction mode power (120W, 150W)
-- `select.tineco_max_mode_power` - MAX mode power (120W, 150W)
-- `select.tineco_max_mode_spray_volume` - MAX mode spray volume (Rinse, Max)
-- `select.tineco_water_mode_power` - Water mode power (90W, 120W, 150W) - *unavailable when water mode is off*
-- `select.tineco_water_mode_spray_volume` - Water mode spray volume (Mist, Wet, Medium, Rinse, Max) - *unavailable when water mode is off*
+- `select.tineco_sound_volume_level` — Low / Medium / High
+- `select.tineco_suction_mode_power` — 120W / 150W
+- `select.tineco_max_mode_power` — 120W / 150W
+- `select.tineco_max_mode_spray_volume` — Rinse / Max
+- `select.tineco_water_mode_power` — 90W / 120W / 150W *(unavailable when water mode is off)*
+- `select.tineco_water_mode_spray_volume` — Mist / Wet / Medium / Rinse / Max *(unavailable when water mode is off)*
 
-### Binary Sensors
-- `binary_sensor.tineco_online` - Device online status
-- `binary_sensor.tineco_charging` - Charging status
+### Binary sensors
+- `binary_sensor.tineco_online`
+- `binary_sensor.tineco_charging`
 
-### Entity Grouping
+### Entity grouping
 
-Entities are named with prefixes for easy grouping in the UI:
+Related controls share a prefix so they group naturally in the UI:
+
 - **Sound**: `Tineco Sound: Enabled`, `Tineco Sound: Volume Level`
 - **Suction Mode**: `Tineco Suction Mode: Power`
 - **MAX Mode**: `Tineco MAX Mode: Power`, `Tineco MAX Mode: Spray Volume`
 - **Water Mode**: `Tineco Water Mode: Enabled`, `Tineco Water Mode: Power`, `Tineco Water Mode: Spray Volume`
 
-### Automation Examples
+
+## Automation examples
 
 #### Remind to empty tank after self-cleaning
 
@@ -140,7 +133,7 @@ Entities are named with prefixes for easy grouping in the UI:
 - alias: "Notify when fresh water tank is empty"
   trigger:
     - platform: state
-      entity_id: sensor.fresh_water_tank_status
+      entity_id: sensor.tineco_fresh_water_tank_status
       to: "empty"
   action:
     - service: notify.notify
@@ -154,7 +147,7 @@ Entities are named with prefixes for easy grouping in the UI:
 - alias: "Notify when waste water tank is full"
   trigger:
     - platform: state
-      entity_id: sensor.waste_water_tank_status
+      entity_id: sensor.tineco_waste_water_tank_status
       to: "full"
   action:
     - service: notify.notify
@@ -176,61 +169,79 @@ Entities are named with prefixes for easy grouping in the UI:
         message: "Your Tineco device is offline"
 ```
 
+
+## API reference
+
+Device queries used by the integration:
+
+- **GCI** (Get Controller Info) — battery, vacuum status, tank state, error codes
+- **GAV** (Get API Version) — firmware version
+- **GCF** (Get Config File) — device configuration
+- **CFP** (Get Config Point) — configuration points, status data
+- **QueryMode / UpdateMode / DeleteMode** — read & change suction / MAX / water modes
+
+### Key fields
+
+- `bp` — battery percentage (0–100)
+- `wm` — working mode (1=Standby, 2=Charging, 3=In Operation, 8=Self-clean, 9=OTA, 13=Drying)
+- `e1` — error code 1 (waste water tank)
+- `e2` — error code 2 (`64` = fresh water tank empty)
+- `e3` — error code 3 (other)
+- `vs` — online flag
+- `wp` — water pressure / percentage
+- `vl` — volume level (1=Low, 2=Medium, 3=High)
+- `ms` — mute status (0=unmuted, 1=muted)
+
+
 ## Troubleshooting
 
-### Invalid Authentication Error
+### Invalid authentication
 
-- Double-check your credentials (email or phone number) and password
-- Chinese users: ensure you are entering your phone number and have selected **CN** as the region
-- Ensure your Tineco account is active
-- Try resetting your Tineco password on the official app
+- Re-check credentials (email **or** phone number for CN) and password
+- CN users: phone number + region set to **CN**
+- Try resetting the password in the official Tineco app first
 
-## API Queries Used
-
-This integration uses the following device queries:
-
-- **GCI** (Get Controller Info) - Battery level, vacuum status, water tank status, error codes
-- **GAV** (Get API Version) - Firmware version information
-- **GCF** (Get Config File) - Device configuration
-- **CFP** (Get Config Point) - Configuration points including status data
-- **QueryMode** - Query current device mode configuration
-- **UpdateMode** - Update mode settings (suction power, MAX mode, water mode)
-- **DeleteMode** - Delete/disable a mode (e.g., disable water-only mode)
-
-### Mode Commands
-
-The integration sends coordinated mode commands when changing mode settings:
-
-1. **UpdateMode** - Suction mode (md=4) with power setting
-2. **UpdateMode** - MAX mode (md=3) with power and spray settings
-3. **UpdateMode/DeleteMode** - Water mode (md=6) - UpdateMode when enabled, DeleteMode when disabled
-4. **QueryMode** - Verify current configuration
-
-### Key API Fields
-
-- `bp` - Battery percentage (0-100)
-- `wm` - Working mode (1=Standby, 2=Charging, 3=In Operation, 8=Self-clean mode, 9=OTA, 13=Drying)
-- `e1` - Error code 1 (waste water tank issues)
-- `e2` - Error code 2 (64 = fresh water tank empty)
-- `e3` - Error code 3 (other errors)
-- `vs` - Device online status
-- `wp` - Water pressure/percentage
-- `vl` - Volume level (1=Low, 2=Medium, 3=High)
-- `ms` - Mute status (0=unmuted, 1=muted)
 
 ## Support
 
-- GitHub Issues: https://github.com/wheeller123/Tineco-HACS-Integration/issues
-- Home Assistant Community: https://community.home-assistant.io/
+If something isn't working, please open an issue with logs so the cause is visible — guessing from a single error line rarely works.
+
+**How to grab logs:**
+
+1. In Home Assistant, edit `configuration.yaml` and add:
+
+   ```yaml
+   logger:
+     default: warning
+     logs:
+       custom_components.tineco: debug
+   ```
+
+2. Restart Home Assistant.
+3. Reproduce the problem (e.g. add the integration, toggle a switch, wait for the failing poll).
+4. Open **Settings** → **System** → **Logs** → **Download Full Log**.
+
+**Open the issue here:** https://github.com/wheeller123/Tineco-HACS-Integration/issues
+
+Please include:
+
+- Home Assistant version, integration version (`2.3.0` etc.), region (`IE` / `US` / `CN` / …) and device model
+- A short description of what you did and what happened
+- The relevant section of the log (scrub anything that looks like a token, account id, or phone number first)
+
+The more context the issue has up front, the faster it can be fixed.
+
 
 ## Credits
 
-Created by Jack Whelan
+Created by Jack Whelan. Community contributions and bug reports welcome.
+
 
 ## Disclaimer
 
-This integration is not affiliated with Tineco. It uses reverse-engineered APIs. Use at your own risk. I developed this specifically for my S7 Flashdry, it may not work with other models but I am happy to try and add others with community support
+This integration is not affiliated with Tineco. It uses reverse-engineered APIs and may break when Tineco changes their servers. Developed primarily against the S7 Flashdry — other models may work with community help.
+
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT — see [`LICENSE`](LICENSE).
