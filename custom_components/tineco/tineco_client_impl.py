@@ -73,6 +73,10 @@ class TinecoClient:
         self.AUTH_TIMEZONE = self.REGION_TIMEZONE_MAP.get(region, "Europe/London")
         rest_suffix = "appapi" if self._is_china_region() else "api"
         self.REST_API_HOST = f"qas-gl-{self.region.lower()}-{rest_suffix}.tineco.com"
+        # IoT login uses the load-balancer's CountryCode, not the ISO region.
+        # For WW regions LB.CountryCode == ISO code; CN's is literally "Chinese".
+        self.IOT_COUNTRY = "Chinese" if self._is_china_region() else self.region
+        self.IOT_ORG = "TEK" if self._is_china_region() else "TEKWW"
 
         self.access_token = ""
         self.uid = ""
@@ -567,13 +571,13 @@ class TinecoClient:
                 "edition": "default",
                 "resource": device_uuid,
                 "last": "",
-                "country": self.region,
-                "org": "TEK" if self._is_china_region() else "TEKWW",
+                "country": self.IOT_COUNTRY,
+                "org": self.IOT_ORG,
             }
 
             _LOGGER.debug(
                 "Tineco: performing IoT login to %s (userId=%s, country=%s, org=%s)",
-                self.IOT_LOGIN_ENDPOINT, self.uid, self.region, payload.get("org"),
+                self.IOT_LOGIN_ENDPOINT, self.uid, self.IOT_COUNTRY, self.IOT_ORG,
             )
             response = self.session.post(self.IOT_LOGIN_ENDPOINT, json=payload, timeout=10)
 

@@ -29,19 +29,22 @@ def offline_dc_lookup():
 
 
 @pytest.mark.parametrize(
-    "region,expect_host,expect_org,expect_tz,expect_lang",
+    "region,expect_host,expect_org,expect_country,expect_tz,expect_lang",
     [
-        ("CN", "qas-gl-cn-appapi.tineco.com", "TEK",   "Asia/Shanghai",     "ZH_CN"),
-        ("IE", "qas-gl-ie-api.tineco.com",    "TEKWW", "Europe/London",     "EN_US"),
-        ("GB", "qas-gl-gb-api.tineco.com",    "TEKWW", "Europe/London",     "EN_US"),
-        ("US", "qas-gl-us-api.tineco.com",    "TEKWW", "America/New_York",  "EN_US"),
-        ("DE", "qas-gl-de-api.tineco.com",    "TEKWW", "Europe/Berlin",     "EN_US"),
-        ("HK", "qas-gl-hk-api.tineco.com",    "TEKWW", "Asia/Hong_Kong",    "ZH_HK"),
-        ("JP", "qas-gl-jp-api.tineco.com",    "TEKWW", "Asia/Tokyo",        "JA_JP"),
+        # CN's IoT country is the literal string "Chinese", not the ISO code.
+        # See IOTLB.java LB_China entry — CountryCode = "Chinese". Sending
+        # country=CN to the IoT endpoint yields errno=1202.
+        ("CN", "qas-gl-cn-appapi.tineco.com", "TEK",   "Chinese", "Asia/Shanghai",     "ZH_CN"),
+        ("IE", "qas-gl-ie-api.tineco.com",    "TEKWW", "IE",      "Europe/London",     "EN_US"),
+        ("GB", "qas-gl-gb-api.tineco.com",    "TEKWW", "GB",      "Europe/London",     "EN_US"),
+        ("US", "qas-gl-us-api.tineco.com",    "TEKWW", "US",      "America/New_York",  "EN_US"),
+        ("DE", "qas-gl-de-api.tineco.com",    "TEKWW", "DE",      "Europe/Berlin",     "EN_US"),
+        ("HK", "qas-gl-hk-api.tineco.com",    "TEKWW", "HK",      "Asia/Hong_Kong",    "ZH_HK"),
+        ("JP", "qas-gl-jp-api.tineco.com",    "TEKWW", "JP",      "Asia/Tokyo",        "JA_JP"),
     ],
 )
-def test_region_constants(region, expect_host, expect_org, expect_tz, expect_lang, offline_dc_lookup):
-    """REST host, IoT org, timezone, and language must match the region."""
+def test_region_constants(region, expect_host, expect_org, expect_country, expect_tz, expect_lang, offline_dc_lookup):
+    """REST host, IoT org/country, timezone, and language must match the region."""
     client = TinecoClient(region=region)
 
     assert client.REST_API_HOST == expect_host, (
@@ -54,10 +57,12 @@ def test_region_constants(region, expect_host, expect_org, expect_tz, expect_lan
     assert client.language == expect_lang, (
         f"Default language mismatch for region={region}: got {client.language}"
     )
-
-    # Compute the org value the way _iot_login does (without invoking the network).
-    org = "TEK" if client._is_china_region() else "TEKWW"
-    assert org == expect_org
+    assert client.IOT_ORG == expect_org, (
+        f"IoT org mismatch for region={region}: got {client.IOT_ORG}"
+    )
+    assert client.IOT_COUNTRY == expect_country, (
+        f"IoT country mismatch for region={region}: got {client.IOT_COUNTRY}"
+    )
 
 
 def test_cn_appapi_host_is_distinct_from_global_api(offline_dc_lookup):
