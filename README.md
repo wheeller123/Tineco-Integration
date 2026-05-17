@@ -212,7 +212,9 @@ If something isn't working, please open an issue with logs attached so the cause
 
    ```yaml
    logger:
-     default: warning
+     default: info
+     logs:
+       custom_components.tineco: debug
    ```
 
    Restart Home Assistant so the `logger` block is active.
