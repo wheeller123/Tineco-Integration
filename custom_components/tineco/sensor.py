@@ -220,22 +220,33 @@ class TinecoModelSensor(TinecoBaseSensor):
             client = stored.get('client')
             if client and hasattr(client, 'devices') and client.devices:
                 device = client.devices[0]
-                
-                # Priority: nick (user-set display name) > productType > deviceName > name
-                # Skip fields starting with '0000' as they are device IDs
+
+                _LOGGER.debug(
+                    "Tineco model sensor: device candidates — nick=%r productType=%r "
+                    "deviceName=%r model=%r deviceModel=%r name=%r keys=%s",
+                    device.get('nick'), device.get('productType'),
+                    device.get('deviceName'), device.get('model'),
+                    device.get('deviceModel'), device.get('name'),
+                    sorted(device.keys()) if isinstance(device, dict) else None,
+                )
+
+                # Prefer productType (canonical model name like "S7 Flashdry") over
+                # nick, since Tineco's default nick can include internal project codes
+                # (e.g. "Floor One-1580") that aren't useful as a model label.
                 model = (
-                    device.get('nick') or  # User-friendly name (e.g., "S7 Flashdry")
                     device.get('productType') or
+                    device.get('productName') or
                     device.get('deviceName') or
                     device.get('model') or
-                    device.get('deviceModel')
+                    device.get('deviceModel') or
+                    device.get('nick')
                 )
                 # Fallback to name only if it doesn't look like a device ID
                 if not model:
                     name = device.get('name')
                     if name and not name.startswith('0000'):
                         model = name
-                
+
                 if model and model != "Unknown":
                     self._state = str(model)
                     return

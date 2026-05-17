@@ -1,9 +1,26 @@
 #!/usr/bin/env python3
-"""Test script to examine Tineco API data without deploying to Home Assistant."""
+"""Test script to examine Tineco API data without deploying to Home Assistant.
 
+Two modes:
+
+* No args (default) — interactive: prompts for credentials and runs the full
+  diagnostic + sequenced mode-command test against the live device.
+
+* ``--dump <path>``  — read-only: logs in, fetches device list + complete
+  device info, scrubs PII, writes JSON suitable for use as a fixture under
+  ``tests/fixtures/``. Skips the mode/light/volume mutation tests entirely.
+
+Example::
+
+    python test_tineco_data.py --dump tests/fixtures/s7_flashdry_user.json
+"""
+
+import argparse
+import copy
 import json
 import os
 import importlib.util
+import sys
 
 # Import TinecoClient by loading the module directly to avoid path conflicts
 def load_tineco_client():
@@ -15,6 +32,92 @@ def load_tineco_client():
     return module.TinecoClient
 
 TinecoClient = load_tineco_client()
+
+
+# Keys whose values may identify a real account/device. Replace with placeholders
+# before writing fixtures. Matched case-insensitively at any depth.
+PII_KEYS = {
+    "did", "didios",
+    "mid", "tuyaid",
+    "account", "email", "mobile", "phone", "phonenumber",
+    "token", "accesstoken", "authcode", "iottoken", "refreshtoken",
+    "uid", "ucuid", "userid",
+    "iconurl", "avatar",
+}
+
+
+def _scrub_pii(obj, placeholder="<scrubbed>"):
+    """Walk dicts/lists and replace any PII_KEYS values with a placeholder.
+
+    Returns a deep-copied structure; the input is left intact.
+    """
+    obj = copy.deepcopy(obj)
+
+    def _walk(node):
+        if isinstance(node, dict):
+            for key, value in list(node.items()):
+                if isinstance(key, str) and key.lower() in PII_KEYS:
+                    node[key] = placeholder
+                elif isinstance(value, (dict, list)):
+                    _walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                _walk(item)
+
+    _walk(obj)
+    return obj
+
+
+def dump_fixture(output_path: str) -> int:
+    """Login, fetch device list + complete device info, scrub PII, write JSON.
+
+    Read-only — never sends control commands. Intended for generating
+    ``tests/fixtures/<device>.json`` payloads.
+    """
+    email = input("Enter Tineco email: ").strip()
+    password = input("Enter Tineco password: ").strip()
+    region = input("Region code (default IE): ").strip() or "IE"
+
+    client = TinecoClient(region=region)
+    print("\n[1/3] Logging in...")
+    success, _token, _uid = client.login(email, password)
+    if not success:
+        print("Login failed.")
+        return 1
+
+    print("[2/3] Getting device list...")
+    client.get_devices()
+    if not client.device_list:
+        print("No devices found.")
+        return 1
+
+    first_device = client.device_list[0]
+    device_id = first_device.get("did") or first_device.get("deviceId")
+    device_class = first_device.get("className", "")
+    device_resource = first_device.get("resource", "")
+
+    print(f"[3/3] Fetching complete device info for {device_id}...")
+    info = client.get_complete_device_info(device_id, device_class, device_resource)
+    if not info:
+        print("Failed to get device info.")
+        return 1
+
+    fixture = {
+        "_source": f"Captured via test_tineco_data.py --dump (region={region}). "
+                   "PII fields scrubbed; review before committing.",
+        "devices": _scrub_pii(client.device_list),
+        "info": _scrub_pii(info),
+    }
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as fh:
+        json.dump(fixture, fh, indent=2, sort_keys=True, default=str)
+
+    print(f"\nWrote fixture to {output_path}")
+    print(f"Devices: {len(fixture['devices'])}, info endpoints: {len(fixture['info'])}")
+    print("REVIEW the file and scrub anything PII_KEYS missed (e.g. project names, locations)")
+    print("before committing it to the repo.")
+    return 0
 
 
 def test_tineco_data():
@@ -465,11 +568,23 @@ def test_tineco_data():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--dump",
+        metavar="PATH",
+        help="Read-only mode: write a fixture JSON to PATH instead of running "
+             "the interactive control tests.",
+    )
+    args = parser.parse_args()
+
     try:
-        test_tineco_data()
+        if args.dump:
+            sys.exit(dump_fixture(args.dump))
+        else:
+            test_tineco_data()
     except KeyboardInterrupt:
         print("\n\nTest interrupted by user")
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\nError: {e}")
         import traceback
         traceback.print_exc()

@@ -1,0 +1,23 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# pytest-homeassistant-custom-component defines ``hass`` as an async fixture
+# but ``enable_custom_integrations`` (which consumes it) is sync. In
+# pytest-asyncio's default STRICT mode the sync consumer receives an
+# unawaited async_generator and trips
+# ``AttributeError: 'async_generator' object has no attribute 'data'``.
+# Auto mode lets pytest-asyncio bridge async fixtures into sync consumers.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+# Ruff defaults (E + F) only. Existing custom_components/tineco code wasn't
+# written against the SIM/B rulesets; enforcing those would mean a
+# code-style PR independent of regression-prevention work.
+ignore = ["E501"]  # line length handled by formatter, not lint
