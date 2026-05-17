@@ -16,25 +16,26 @@ if str(REPO_ROOT) not in sys.path:
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-# pytest-homeassistant-custom-component requires the `enable_custom_integrations`
-# fixture to be active so the `hass` fixture's HA core can discover the tineco
-# custom integration when calling `hass.config_entries.async_setup`. Without it,
-# integration-setup / config-flow / coordinator tests fail with
-# "Integration tineco not found".
+# Auto-enable the HA custom-integration loader, but ONLY for tests that
+# actually request the ``hass`` fixture. The plugin's ``enable_custom_integrations``
+# fixture depends transitively on the async ``hass`` fixture; resolving it
+# from a sync autouse without the test owning ``hass`` returns an
+# ``async_generator`` instead of a real HomeAssistant and the plugin crashes
+# with ``'async_generator' object has no attribute 'data'``.
 #
-# Indirect-lookup pattern: request the fixture via ``request.getfixturevalue``
-# at autouse time. On CI (Ubuntu, plugin loaded) it resolves cleanly. Locally
-# on Windows (plugin can't load — HA's runner needs POSIX ``fcntl``) the
-# lookup raises and we swallow it — the WS3 tests that *need* it are also
-# skipped at module level via ``pytest.importorskip``.
+# This pattern means WS1/WS2 unit tests (sync, no ``hass``) skip the
+# resolution entirely while WS3 integration tests (async, request ``hass``)
+# get custom-integration loading for free without each test having to list
+# the fixture explicitly.
 @pytest.fixture(autouse=True)
 def _auto_enable_custom_integrations(request):
-    try:
-        request.getfixturevalue("enable_custom_integrations")
-    except pytest.FixtureLookupError:
-        # Plugin not loaded — WS1/WS2 tests don't need it, and WS3 tests
-        # self-skip.
-        pass
+    if "hass" in request.fixturenames:
+        try:
+            request.getfixturevalue("enable_custom_integrations")
+        except pytest.FixtureLookupError:
+            # Plugin not loaded (e.g. local Windows): WS3 tests self-skip,
+            # so this branch is harmless.
+            pass
     yield
 
 
