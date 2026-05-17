@@ -1,0 +1,82 @@
+{
+  "_source": "Captured 2026-05-16 from maintainer's S7 Flashdry on v2.2.11 (debug log lines 580-581). Values for nick/productType/deviceName/model/deviceModel/name/keys are real; payload values for gav/gcf/cfp/query_mode are synthetic placeholders sufficient for sensor logic tests. PII (did/email/tokens/etc.) scrubbed.",
+  "_regression_note": "This fixture demonstrates the v2.2.10→v2.2.12 regression: API returns nick='Floor One-1580' (Tineco's default device name embedding internal project code) and productType='S7 Flashdry' (canonical model). The model sensor must report 'S7 Flashdry', not 'Floor One-1580'.",
+  "devices": [
+    {
+      "acceptAgreement": "Y",
+      "bindType": 1,
+      "catalog": "FLOOR",
+      "className": "9uened",
+      "company": "TEK",
+      "did": "00000000-0000-0000-0000-000000000001",
+      "didIos": "00000000-0000-0000-0000-000000000001",
+      "goToDeviceDetailPage": false,
+      "iconUrl": "",
+      "isAuth": "Y",
+      "isElasticityRookie": false,
+      "isRookie": false,
+      "lastTime": 0,
+      "lastUseTime": 0,
+      "modes": [],
+      "mostCommonMode": "",
+      "mostCommonModeKey": "",
+      "name": "0000000tl2uvmb8j1580",
+      "needView": false,
+      "nick": "Floor One-1580",
+      "pageType": "FLOOR",
+      "productName": "",
+      "productType": "S7 Flashdry",
+      "projectName": "CL2349",
+      "projectToolConfig": "",
+      "ptpStatus": 0,
+      "remoteConfig": {},
+      "resource": "T033",
+      "saveWater": 0,
+      "sound": 1,
+      "suffix": "",
+      "toolConfig": "",
+      "totalDustNum": 0,
+      "totalRestUseTime": 0,
+      "totalUseTimeKey": "",
+      "version": ""
+    }
+  ],
+  "info": {
+    "gci": {
+      "selectmode": 0,
+      "wheel": 2,
+      "cleanway": 1,
+      "led": 0,
+      "msr": 0,
+      "vl": 1,
+      "wp": 238,
+      "wm": 2,
+      "dv": 0,
+      "bp": 93,
+      "vs": 1,
+      "e1": 0,
+      "e2": 0,
+      "e3": 0
+    },
+    "gav": {
+      "vv": "1.0.5",
+      "tv": "1.2.3",
+      "pv": "1.0.0",
+      "av": "v3"
+    },
+    "gcf": {
+      "version": "1.0.0"
+    },
+    "cfp": {
+      "wm": 2,
+      "bp": 93,
+      "e1": 0,
+      "e2": 0
+    },
+    "query_mode": {
+      "cfg": [
+        {"id": 1, "name": "default"}
+      ]
+    }
+  }
+}

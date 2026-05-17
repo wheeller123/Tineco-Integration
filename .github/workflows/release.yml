@@ -25,10 +25,15 @@ jobs:
       - name: Validate version matches tag
         if: github.event_name == 'release'
         run: |
-          tag_version="${GITHUB_REF#refs/tags/v}"
+          # Strip the leading "v" and any pre-release suffix so that
+          # v2.2.14-rc1 / v2.2.14-beta1 / v2.2.14-alpha1 all validate against
+          # manifest.version = "2.2.14". Pre-release builds keep semantic
+          # versioning while still being gated by this check.
+          raw="${GITHUB_REF#refs/tags/v}"
+          tag_version="${raw%%-*}"
           manifest_version="${{ steps.version.outputs.version }}"
           if [ "$tag_version" != "$manifest_version" ]; then
-            echo "Error: Tag version ($tag_version) does not match manifest version ($manifest_version)"
+            echo "Error: Tag version ($tag_version, from $raw) does not match manifest version ($manifest_version)"
             exit 1
           fi
 
