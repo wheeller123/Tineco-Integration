@@ -568,7 +568,7 @@ class TinecoClient:
                 "resource": device_uuid,
                 "last": "",
                 "country": self.region,
-                "org": "TEKWW"
+                "org": "TEK" if self._is_china_region() else "TEKWW",
             }
 
             _LOGGER.debug(
