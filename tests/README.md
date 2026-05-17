@@ -18,7 +18,7 @@ The same command is what CI runs (`.github/workflows/tests.yml`).
 The fastest path is the `--dump` flag on the existing manual capture script:
 
 ```
-python test_tineco_data.py --dump tests/fixtures/<device>.json
+python scripts/test_tineco_data.py --dump tests/fixtures/<device>.json
 ```
 
 That writes `{"devices": [...], "info": {...}}` straight into the fixtures

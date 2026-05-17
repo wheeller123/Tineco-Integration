@@ -8,8 +8,8 @@ import sys
 import json
 from pathlib import Path
 
-# Add the custom_components directory to the path
-sys.path.insert(0, str(Path(__file__).parent / "custom_components" / "tineco"))
+# Script lives in scripts/; custom_components/ is one level up at repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "custom_components" / "tineco"))
 
 from tineco_client_impl import TinecoClient
 

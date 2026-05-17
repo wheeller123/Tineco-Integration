@@ -60,14 +60,14 @@ python scripts/smoke_ha_api.py
 
 Both must report `All checks passed` / `All HA smoke checks passed`. If
 either fails, capture the failing API payload with
-`python test_tineco_data.py --dump tests/fixtures/<name>.json`, add a
+`python scripts/test_tineco_data.py --dump tests/fixtures/<name>.json`, add a
 matching unit test, fix the underlying issue, and retry from step 1.
 
 ## When a new device model gets reported in issues
 
 Before closing the issue:
 
-1. Ask the reporter to run `python test_tineco_data.py --dump <name>.json`.
+1. Ask the reporter to run `python scripts/test_tineco_data.py --dump <name>.json`.
 2. Review the JSON; manually scrub any PII the automatic scrub missed.
 3. Commit it as `tests/fixtures/<name>.json`.
 4. Add a one-line assertion to `tests/test_sensors_parametrized.py` so

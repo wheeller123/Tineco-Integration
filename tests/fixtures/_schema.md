@@ -33,4 +33,4 @@ Strip or replace these values with placeholders:
 - `token`, `accessToken`, `authCode`, `iotToken` — credentials
 - `uid`, `ucUid`, `userId` — user IDs
 
-`test_tineco_data.py --dump <path>` does this automatically.
+`scripts/test_tineco_data.py --dump <path>` does this automatically.

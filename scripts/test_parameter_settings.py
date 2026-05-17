@@ -9,7 +9,9 @@ import time
 # Import TinecoClient by loading the module directly to avoid path conflicts
 def load_tineco_client():
     """Load TinecoClient module without adding to sys.path."""
-    tineco_path = os.path.join(os.path.dirname(__file__), 'custom_components', 'tineco', 'tineco_client_impl.py')
+    # Script lives in scripts/; custom_components/ is one level up at repo root.
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tineco_path = os.path.join(repo_root, 'custom_components', 'tineco', 'tineco_client_impl.py')
     spec = importlib.util.spec_from_file_location("tineco_client_impl", tineco_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

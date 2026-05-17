@@ -294,7 +294,7 @@ def run(region: str) -> int:
         print(_c("All checks passed. Safe to tag/release.", GREEN))
         return 0
     print(_c(f"{failures} check(s) failed. DO NOT TAG — investigate first.", RED))
-    print(_c("Capture the failing response with `test_tineco_data.py --dump` "
+    print(_c("Capture the failing response with `scripts/test_tineco_data.py --dump` "
              "and add it as a fixture before fixing.", DIM))
     return 1
 
