@@ -16,6 +16,28 @@ if str(REPO_ROOT) not in sys.path:
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
+# pytest-homeassistant-custom-component requires the `enable_custom_integrations`
+# fixture to be active so the `hass` fixture's HA core can discover the tineco
+# custom integration when calling `hass.config_entries.async_setup`. Without it,
+# integration-setup / config-flow / coordinator tests fail with
+# "Integration tineco not found".
+#
+# Indirect-lookup pattern: request the fixture via ``request.getfixturevalue``
+# at autouse time. On CI (Ubuntu, plugin loaded) it resolves cleanly. Locally
+# on Windows (plugin can't load — HA's runner needs POSIX ``fcntl``) the
+# lookup raises and we swallow it — the WS3 tests that *need* it are also
+# skipped at module level via ``pytest.importorskip``.
+@pytest.fixture(autouse=True)
+def _auto_enable_custom_integrations(request):
+    try:
+        request.getfixturevalue("enable_custom_integrations")
+    except pytest.FixtureLookupError:
+        # Plugin not loaded — WS1/WS2 tests don't need it, and WS3 tests
+        # self-skip.
+        pass
+    yield
+
+
 @pytest.fixture
 def load_fixture():
     """Return a loader that reads tests/fixtures/<name>.json."""

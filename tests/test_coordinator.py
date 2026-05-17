@@ -43,7 +43,7 @@ async def test_coordinator_first_refresh_populates_data(hass: HomeAssistant):
         "name": "0000000abcdef",
     }
 
-    with patch("custom_components.tineco.TinecoDeviceClient") as mock_cls:
+    with patch("custom_components.tineco.client.TinecoDeviceClient") as mock_cls:
         instance = mock_cls.return_value
         instance.async_login = AsyncMock(return_value=True)
         instance.async_get_devices = AsyncMock(return_value=[device_info_payload])
@@ -77,7 +77,7 @@ async def test_coordinator_first_refresh_populates_data(hass: HomeAssistant):
 async def test_coordinator_handles_empty_device_list(hass: HomeAssistant):
     """If get_devices returns no devices, the coordinator marks the refresh failed
     rather than crashing."""
-    with patch("custom_components.tineco.TinecoDeviceClient") as mock_cls:
+    with patch("custom_components.tineco.client.TinecoDeviceClient") as mock_cls:
         instance = mock_cls.return_value
         instance.async_login = AsyncMock(return_value=True)
         instance.async_get_devices = AsyncMock(return_value=None)

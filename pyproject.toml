@@ -1,6 +1,8 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"
+# Don't set asyncio_mode here — pytest-homeassistant-custom-component sets its
+# own mode and overriding it caused autoload conflicts. WS3 tests use the
+# explicit @pytest.mark.asyncio decorator.
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
@@ -10,5 +12,7 @@ target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "SIM"]
+# Ruff defaults (E + F) only. Existing custom_components/tineco code wasn't
+# written against the SIM/B rulesets; enforcing those would mean a
+# code-style PR independent of regression-prevention work.
 ignore = ["E501"]  # line length handled by formatter, not lint

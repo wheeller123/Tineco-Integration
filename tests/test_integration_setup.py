@@ -28,7 +28,7 @@ from custom_components.tineco.const import DOMAIN
 @pytest.fixture
 def mock_tineco_device_client():
     """Patch the wrapper used by async_setup_entry to avoid live API calls."""
-    with patch("custom_components.tineco.TinecoDeviceClient") as mock_cls:
+    with patch("custom_components.tineco.client.TinecoDeviceClient") as mock_cls:
         instance = mock_cls.return_value
         instance.async_login = AsyncMock(return_value=True)
         instance.async_get_devices = AsyncMock(return_value=[{
@@ -77,8 +77,6 @@ async def test_setup_entry_loads_all_platforms(hass: HomeAssistant, mock_tineco_
     await hass.async_block_till_done()
 
     # All four platforms should have at least one entity registered.
-    entity_reg = hass.helpers.entity_registry.async_get(hass) if False else None
-    # ^ guard the deprecated helper-style access; use the module-level API instead.
     from homeassistant.helpers import entity_registry as er
     registry = er.async_get(hass)
     entities = [e for e in registry.entities.values() if e.config_entry_id == entry.entry_id]
@@ -94,7 +92,7 @@ async def test_setup_entry_loads_all_platforms(hass: HomeAssistant, mock_tineco_
 async def test_setup_entry_handles_login_failure_gracefully(hass: HomeAssistant):
     """If login fails at setup time we still return True so HA shows the entry
     as 'not ready' rather than crashing; the coordinator retries on next tick."""
-    with patch("custom_components.tineco.TinecoDeviceClient") as mock_cls:
+    with patch("custom_components.tineco.client.TinecoDeviceClient") as mock_cls:
         instance = mock_cls.return_value
         instance.async_login = AsyncMock(return_value=False)
         instance.async_get_devices = AsyncMock(return_value=None)
