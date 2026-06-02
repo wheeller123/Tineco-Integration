@@ -4,7 +4,7 @@ Tineco IoT API Client Implementation.
 import json
 import logging
 import requests
-from requests.exceptions import SSLError
+from requests.exceptions import SSLError, Timeout
 import hashlib
 import time
 import uuid
@@ -84,6 +84,9 @@ class TinecoClient:
         self.iot_token = ""
         self.iot_resource = ""
         self.device_list = []
+        # Actions whose timeouts have already been logged once, to avoid
+        # spamming the log every refresh while an upstream action is flaky.
+        self._timed_out_actions = set()
 
         self.session = requests.Session()
         self.session.headers.update({
@@ -764,7 +767,7 @@ class TinecoClient:
 
     def _send_iot_query(self, device_id: str, action: str,
                         device_class: str = "", device_resource: str = "",
-                        session_id: str = "") -> Optional[Dict]:
+                        session_id: str = "", timeout: int = 10) -> Optional[Dict]:
         """Internal method to send IoT query actions"""
         if not self.access_token:
             _LOGGER.error("Tineco: _send_iot_query called before login")
@@ -797,12 +800,14 @@ class TinecoClient:
             }
 
             _LOGGER.debug("Tineco: IoT query device=%s action=%s", device_id, action)
-            response = self.session.post(self.IOT_API_BASE, params=params, headers=headers, timeout=10)
+            response = self.session.post(self.IOT_API_BASE, params=params, headers=headers, timeout=timeout)
 
             if response.status_code == 200:
                 ngiot_ret = response.headers.get("X-NGIOT-RET", "")
 
                 if ngiot_ret == "ok":
+                    # Action is responding again; clear any prior timeout suppression.
+                    self._timed_out_actions.discard(action)
                     if response.text:
                         try:
                             return response.json()
@@ -817,6 +822,19 @@ class TinecoClient:
                 _LOGGER.error("Tineco: _send_iot_query HTTP error %s for action=%s", response.status_code, action)
                 return None
 
+        except Timeout as e:
+            # The upstream Ecovacs/Tineco IoT endpoint intermittently stops responding
+            # for individual actions (notably 'gcf'). This is transient and the device
+            # is still reachable via the other actions, so don't spam ERROR every cycle.
+            if action not in self._timed_out_actions:
+                self._timed_out_actions.add(action)
+                _LOGGER.warning(
+                    "Tineco: IoT query action=%s timed out (will be suppressed for this "
+                    "action until it recovers): %s", action, e
+                )
+            else:
+                _LOGGER.debug("Tineco: IoT query action=%s timed out again: %s", action, e)
+            return None
         except Exception as e:
             _LOGGER.error("Tineco: exception in _send_iot_query action=%s: %s", action, e)
             return None
@@ -833,8 +851,13 @@ class TinecoClient:
 
     def get_config_file(self, device_id: str, device_class: str = "",
                         device_resource: str = "") -> Optional[Dict]:
-        """Get configuration file (GCF - Get Config File)"""
-        return self._send_iot_query(device_id, "gcf", device_class, device_resource)
+        """Get configuration file (GCF - Get Config File).
+
+        This upstream action is frequently unresponsive. It is best-effort and
+        not required for core state, so it uses a shorter timeout to avoid
+        adding ~10s to every refresh when the endpoint is hanging.
+        """
+        return self._send_iot_query(device_id, "gcf", device_class, device_resource, timeout=4)
 
     def get_device_config_point(self, device_id: str, device_class: str = "",
                                 device_resource: str = "") -> Optional[Dict]:

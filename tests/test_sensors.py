@@ -135,7 +135,8 @@ def test_vacuum_status_self_cleaning_wm_8_process_5():
     assert sensor._state == "self_cleaning"
 
 
-def test_water_tank_clean_when_e1_zero(load_fixture):
+def test_water_tank_clean_when_no_full_signal(load_fixture):
+    """s7_flashdry has e1/e2/e3 all 0 (and e2 bit 256 clear) → 'clean'."""
     fx = load_fixture("s7_flashdry")
     sensor = make_sensor(TinecoWaterTankSensor, devices=fx["devices"])
 
@@ -144,7 +145,27 @@ def test_water_tank_clean_when_e1_zero(load_fixture):
     assert sensor._state == "clean"
 
 
+def test_water_tank_full_when_e2_bit_256():
+    """Definitive S7 Flashdry signal: e2 bit 256 set → waste tank 'full'."""
+    sensor = make_sensor(TinecoWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"wp": 238, "e1": 0, "e2": 256, "e3": 0}})
+
+    assert sensor._state == "full"
+
+
+def test_water_tank_full_from_s7_dirty_full_fixture(load_fixture):
+    """Real S7 Flashdry capture: dirty tank full reports e2=256."""
+    fx = load_fixture("s7_dirty_tank_full")
+    sensor = make_sensor(TinecoWaterTankSensor, devices=fx["devices"])
+
+    sensor._update_state_from_data(fx["info"])
+
+    assert sensor._state == "full"
+
+
 def test_water_tank_full_when_e1_nonzero():
+    """Legacy fallback: firmware that only reports e1 still flips to 'full'."""
     sensor = make_sensor(TinecoWaterTankSensor)
 
     sensor._update_state_from_data({"gci": {"e1": 1}})
@@ -152,21 +173,90 @@ def test_water_tank_full_when_e1_nonzero():
     assert sensor._state == "full"
 
 
-def test_fresh_water_tank_full_when_e2_zero(load_fixture):
-    fx = load_fixture("s7_flashdry")
-    sensor = make_sensor(TinecoFreshWaterTankSensor, devices=fx["devices"])
+def test_water_tank_full_from_e3_bit_12(load_fixture):
+    """Issue #29: waste/dirty tank full is encoded as warning code 44,
+    i.e. bit 12 of the e3 bitmask (e3 & 4096)."""
+    fx = load_fixture("s5_tanks_warning")
+    sensor = make_sensor(TinecoWaterTankSensor, devices=fx["devices"])
 
     sensor._update_state_from_data(fx["info"])
 
     assert sensor._state == "full"
 
 
+def test_water_tank_clean_when_only_fresh_empty_bit_set():
+    """e2 bit 64 (fresh tank empty) must NOT trigger the waste-tank sensor."""
+    sensor = make_sensor(TinecoWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"e1": 0, "e2": 64, "e3": 0}})
+
+    assert sensor._state == "clean"
+
+
+def test_fresh_water_tank_full_when_water_present():
+    """Captured S7 Flashdry 'has water' state: wp=238, e2=0 → 'full'.
+    (wp=238 is the has-water reading, NOT an empty sentinel.)"""
+    sensor = make_sensor(TinecoFreshWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"wp": 238, "e1": 0, "e2": 0, "e3": 0}})
+
+    assert sensor._state == "full"
+
+
 def test_fresh_water_tank_empty_when_e2_is_64():
+    """Definitive S7 Flashdry empty signal: e2 bit 64 set → 'empty'."""
     sensor = make_sensor(TinecoFreshWaterTankSensor)
 
     sensor._update_state_from_data({"gci": {"e2": 64}})
 
     assert sensor._state == "empty"
+
+
+def test_fresh_water_tank_empty_from_s7_transition(load_fixture):
+    """Real S7 Flashdry full→empty capture: empty state is wp=239, e2=64."""
+    fx = load_fixture("s7_insufficient_water")
+    sensor = make_sensor(TinecoFreshWaterTankSensor, devices=fx["devices"])
+
+    sensor._update_state_from_data(fx["info"])
+
+    assert sensor._state == "empty"
+
+
+def test_fresh_water_tank_empty_from_e3_bit_13(load_fixture):
+    """Clean/fresh tank empty is warning code 45, i.e. bit 13 of e3 (e3 & 8192)."""
+    fx = load_fixture("s5_tanks_warning")
+    sensor = make_sensor(TinecoFreshWaterTankSensor, devices=fx["devices"])
+
+    sensor._update_state_from_data(fx["info"])
+
+    assert sensor._state == "empty"
+
+
+def test_fresh_water_tank_empty_from_wp_239():
+    """wp flips to 239 (no water) → 'empty' even if e2/e3 are absent."""
+    sensor = make_sensor(TinecoFreshWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"wp": 239, "e1": 0, "e3": 0}})
+
+    assert sensor._state == "empty"
+
+
+def test_fresh_water_tank_full_when_no_empty_signal():
+    """No e2/e3 empty flag and wp at the has-water value → 'full'."""
+    sensor = make_sensor(TinecoFreshWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"wp": 238, "e3": 4096}})
+
+    assert sensor._state == "full"
+
+
+def test_fresh_water_tank_full_when_only_waste_full_bit_set():
+    """e2 bit 256 (waste tank full) must NOT trigger the fresh-tank sensor."""
+    sensor = make_sensor(TinecoFreshWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"wp": 238, "e1": 0, "e2": 256, "e3": 0}})
+
+    assert sensor._state == "full"
 
 
 def test_brush_roller_normal_when_no_br_field(load_fixture):

@@ -527,22 +527,56 @@ class TinecoWaterTankSensor(TinecoBaseSensor):
             self._state = "clean"
 
     def _parse_water_tank_status(self, payload: Dict) -> Optional[str]:
-        """Parse waste water tank status from payload."""
+        """Parse waste (dirty) water tank status from payload.
+
+        ``e2`` is a bitmask of tank conditions, confirmed from captured S7
+        Flashdry transitions:
+
+            e2 & 256  → waste / dirty water tank full
+            e2 & 64   → fresh / clean water tank empty (see fresh-water sensor)
+
+        On firmware that reports tank state through the ``e3`` warning bitmask
+        instead, the dirty-tank-full warning is code 44 = ``e3 & (1 << 12)``
+        (== ``e3 & 4096``), decoded from the Tineco app
+        (FloorFourDeviceFragment.setErrorStatus). ``e1 > 0`` is the legacy
+        single-value fallback.
+
+        We only conclude "clean" once every available signal has been checked
+        and none flagged full.
+        """
         if not isinstance(payload, dict):
             return None
 
-        fields = _extract_values(payload, ["e1", "mdt"])
-        
-        # Check e1 field if it exists (might indicate waste tank issue)
-        e1 = fields.get("e1")
-        if e1 is not None:
+        fields = _extract_values(payload, ["e2", "e3", "e1"])
+
+        # Definitive signal on the S7 Flashdry: e2 bit 256 == waste tank full.
+        e2 = fields.get("e2")
+        if e2 is not None:
             try:
-                error_code = int(e1)
-                if error_code > 0:
+                if int(e2) & 256:
                     return "full"
             except (ValueError, TypeError):
                 pass
-        
+
+        # e3 warning bitmask: bit 12 == warning code 44 (waste tank full)
+        # on firmware that reports tank state this way.
+        e3 = fields.get("e3")
+        if e3 is not None:
+            try:
+                if int(e3) & (1 << 12):
+                    return "full"
+            except (ValueError, TypeError):
+                pass
+
+        # Legacy fallback for firmware that only reports the older e1 field.
+        e1 = fields.get("e1")
+        if e1 is not None:
+            try:
+                if int(e1) > 0:
+                    return "full"
+            except (ValueError, TypeError):
+                pass
+
         return "clean"
     
     @property
@@ -591,22 +625,58 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
             self._state = "full"
 
     def _parse_fresh_water_status(self, payload: Dict) -> Optional[str]:
-        """Parse fresh water tank status from payload."""
+        """Parse fresh (clean) water tank status from payload.
+
+        Determined empirically from a captured S7 Flashdry full→empty
+        transition (filling the tank then running until the "insufficient
+        water" icon appeared):
+
+            water present:  wp=238, e2=0   → full
+            empty / low:    wp=239, e2=64  → empty
+
+        So the definitive empty signal is the ``e2`` bit 64 (``e2 & 64``),
+        corroborated by the ``wp`` level reading flipping from 238 (has water)
+        to 239 (no water). ``wp=238`` is the *has-water* value, **not** an
+        empty sentinel — an earlier build wrongly treated 238/239/240 as
+        "empty" and got stuck reporting empty. (``e2`` is a bitmask: bit 256
+        is the waste-tank-full flag — see the waste water tank sensor.)
+
+        ``e3`` bit 13 (warning code 45) is also honoured for firmware that
+        reports tank state through the e3 bitmask instead.
+        """
         if not isinstance(payload, dict):
             return None
 
-        fields = _extract_values(payload, ["e2"])
-        
-        # Check e2 field: 64 = fresh water tank empty
+        fields = _extract_values(payload, ["e2", "e3", "wp"])
+
+        # Definitive signal on the S7 Flashdry: e2 bit 64 == clean tank empty.
         e2 = fields.get("e2")
         if e2 is not None:
             try:
-                error_code = int(e2)
-                if error_code == 64:
+                if int(e2) & 64:
                     return "empty"
             except (ValueError, TypeError):
                 pass
-        
+
+        # e3 warning bitmask: bit 13 == warning code 45 (clean tank empty)
+        # on firmware that reports tank state this way.
+        e3 = fields.get("e3")
+        if e3 is not None:
+            try:
+                if int(e3) & (1 << 13):
+                    return "empty"
+            except (ValueError, TypeError):
+                pass
+
+        # Corroborating signal: wp flips 238 (has water) → 239/240 (no water).
+        wp = fields.get("wp")
+        if wp is not None:
+            try:
+                if int(wp) in (239, 240):
+                    return "empty"
+            except (ValueError, TypeError):
+                pass
+
         return "full"
     
     @property

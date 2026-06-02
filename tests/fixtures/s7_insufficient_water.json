@@ -1,0 +1,47 @@
+{
+  "_source": "Captured 2026-06-02 from a maintainer S7 Flashdry, EMPTY state, during a full→empty transition test (home-assistant_tineco log 18-50). gci payload values are real; device metadata matches the known S7 Flashdry shape. PII (did/email/tokens) scrubbed.",
+  "_regression_note": "Real full→empty transition: water present = wp=238,e2=0 (full); empty/insufficient = wp=239,e2=64 (this fixture). The definitive empty signal is e2 bit 64, corroborated by wp flipping 238→239. wp=238 is the HAS-WATER value, NOT an empty sentinel — an earlier build wrongly mapped 238/239/240→empty and got stuck on empty. The fresh water tank sensor must report 'empty' here.",
+  "devices": [
+    {
+      "catalog": "FLOOR",
+      "className": "9uened",
+      "company": "TEK",
+      "did": "00000000-0000-0000-0000-000000000003",
+      "name": "0000000tl2uvmb8j1580",
+      "nick": "Floor One-1580",
+      "productType": "S7 Flashdry",
+      "resource": "T033"
+    }
+  ],
+  "info": {
+    "gci": {
+      "selectmode": 3,
+      "wheel": 2,
+      "cleanway": 1,
+      "led": 0,
+      "msr": 0,
+      "vl": 1,
+      "wp": 239,
+      "wm": 3,
+      "dv": 0,
+      "bp": 79,
+      "vs": 1,
+      "e1": 0,
+      "e2": 64,
+      "e3": 0
+    },
+    "gav": {
+      "vv": "1.0.5",
+      "tv": "1.2.3",
+      "pv": "1.0.0",
+      "av": "v3"
+    },
+    "cfp": {
+      "wm": 3,
+      "bp": 79,
+      "wp": 239,
+      "e1": 0,
+      "e2": 64
+    }
+  }
+}

@@ -2,11 +2,35 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-Current version: **2.3.0** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models may work with community feedback.
+Current version: **2.4.1** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro) work with community feedback.
 
 ### Community Lovelace Card
 
 A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](https://github.com/MattiaSaiko/lovelace-tineco-card)
+
+
+## What's New
+
+### 2.4.1
+
+- **Water tank statuses now work.** Both the *waste/dirty* and *fresh/clean*
+  tank sensors now track correctly on the S7 Flashdry, verified against captured
+  full↔empty transitions. The `e2` field is a bitmask: bit `256` = waste tank
+  full, bit `64` = fresh tank empty (the fresh tank also corroborates via the
+  `wp` level flipping 238→239). Previously the waste tank was stuck on *Clean*
+  and the fresh tank didn't track properly. Great for "empty the tank" /
+  "refill water" reminder automations. (#29)
+- **Online sensor no longer flips to *off* by mistake.** The online and charging
+  binary sensors used to run their own slow API calls — which timed out, logged
+  *"taking over 10 seconds"* warnings, and reported the wrong state. They now
+  follow the integration's shared update cycle: online simply reflects whether the
+  last poll reached the device.
+- **Quieter, faster polling.** The occasionally-unresponsive `gcf` request is now
+  best-effort with a short timeout, and its repeated `Read timed out` messages are
+  no longer logged as errors every cycle. Device state comes from the other
+  endpoints, so a `gcf` hiccup no longer slows down or fails a refresh. (#29)
+
+See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 
 ## Features
@@ -182,13 +206,23 @@ Device queries used by the integration:
 
 ### Key fields
 
-- `bp` — battery percentage (0–100)
+- `bp` — battery percentage (0–100). Sentinel values 238/239/240 mean "no data / error".
+- `e2` — tank-condition **bitmask** (primary signal on the S7 Flashdry, verified
+  from captured transitions):
+  - bit `64` (`e2 & 64`) — **fresh / clean water tank empty**
+  - bit `256` (`e2 & 256`) — **waste / dirty water tank full**
+  - the two bits are independent and can be set together
+- `wp` — clean (fresh) water tank level indicator. On the S7 Flashdry it
+  reports `238` when water is present and flips to `239` when empty (a
+  corroborating signal alongside `e2 & 64`). `wp=238` is **not** an empty
+  sentinel.
 - `wm` — working mode (1=Standby, 2=Charging, 3=In Operation, 8=Self-clean, 9=OTA, 13=Drying)
-- `e1` — error code 1 (waste water tank)
-- `e2` — error code 2 (`64` = fresh water tank empty)
-- `e3` — error code 3 (other)
+- `e3` — alternate warning bitmask used by some firmware. Each set bit `n` maps
+  to warning code `n + 32` (decoded from the Tineco app). Notably:
+  - bit 12 (`e3 & 4096`, code 44) — waste / dirty water tank full
+  - bit 13 (`e3 & 8192`, code 45) — fresh / clean water tank empty
+- `e1` — legacy single-value waste-tank fallback (`e1 > 0`) on older firmware
 - `vs` — online flag
-- `wp` — water pressure / percentage
 - `vl` — volume level (1=Low, 2=Medium, 3=High)
 - `ms` — mute status (0=unmuted, 1=muted)
 

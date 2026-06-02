@@ -13,6 +13,39 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+## [v2.4.1] - 2026-06-02
+
+### Fixed
+- **Water tank statuses (waste/dirty and fresh/clean) not tracking
+  empty/full** (#29, S7 Flashdry). Determined empirically from captured
+  full↔empty transitions: `e2` is a **bitmask** of tank conditions —
+  `e2 & 64` = fresh/clean tank empty, `e2 & 256` = waste/dirty tank full —
+  while `e1`/`e3` stay 0 on this firmware. The fresh tank also corroborates
+  via the `wp` level reading flipping from 238 (has water) to 239 (empty);
+  `wp=238` is the *has-water* value, not an empty sentinel. The sensors now:
+    - waste/dirty: `full` on `e2 & 256` (or `e3` bit-12 warning code 44, or
+      legacy `e1 > 0`), else `clean`.
+    - fresh/clean: `empty` on `e2 & 64` (or `e3` bit-13 warning code 45, or
+      `wp` in {239, 240}), else `full`.
+  Both sensors check every available signal before concluding the
+  not-triggered state (a prior short-circuit on `e3` hid the real `e2`
+  signal), and the two `e2` bits are independent so they never cross-trigger.
+  The `e3`/`e1` paths remain for firmware that reports tank state that way.
+  (An earlier pre-release wrongly treated `wp` 238/239/240 as "empty" and got
+  stuck reporting empty; corrected here.)
+- **Online binary sensor reported "on" at startup then flipped "off" regardless
+  of actual state**, with repeated `Update of binary_sensor...online is taking
+  over 10 seconds` warnings. The online/charging binary sensors no longer issue
+  their own independent IoT queries; they now derive state from the shared
+  `DataUpdateCoordinator` (online = the last refresh succeeded). This removes the
+  duplicate per-entity API calls and the false state flip.
+- **`gcf` (Get Config File) read timeouts spamming the log every refresh** as
+  `ERROR ... Read timed out. (read timeout=10)`. This upstream endpoint is
+  intermittently unresponsive; it is now best-effort with a shorter (4s) timeout,
+  and a per-action timeout is logged once as a `WARNING` instead of an `ERROR`
+  every cycle. Core state comes from `gci`/`QueryMode`, so a `gcf` timeout no
+  longer slows or fails the refresh. (#29)
+
 ### Added
 - Pytest unit-test suite under `tests/` covering sensor field-priority logic,
   region/URL construction, entity unique-id stability, and the HA config-flow
