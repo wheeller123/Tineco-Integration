@@ -14,6 +14,14 @@ Two rules for contributors:
 ## [Unreleased]
 
 ### Fixed
+- **Fresh (clean) water tank status stuck on "Full" when the tank is low**
+  (S7 Flashdry showing "Insufficient water" in the app). On this firmware the
+  low-water condition is reported via the `wp` (clean-water level) field as a
+  sentinel value (238/239/240) while `e1`/`e2`/`e3` stay 0 — not via the `e3`
+  bitmask. The fresh water tank sensor now reads `wp` first (sentinel ⇒
+  `empty`), then falls back to the `e3` bit-13 and legacy `e2` checks. Decoded
+  from the Tineco app (`FloorThreeDeviceFragment`/`FloorFourDeviceFragment`
+  `setBatteryAndWater`).
 - **Waste (dirty) water tank status always showing "Clean"** (#29). The sensor
   keyed off the `e1` field, but the dirty-water-tank-full warning (app code 44)
   is actually bit 12 of the `e3` bitmask (`e3 & 4096`). Decoded from the Tineco

@@ -607,27 +607,49 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
             _LOGGER.error(f"Error parsing fresh water tank status: {err}", exc_info=True)
             self._state = "full"
 
+    # ``wp`` (clean water tank level %) reports these sentinel values when the
+    # tank is empty / "insufficient water" instead of a 0-100 percentage.
+    # Decoded from the Tineco Android app (FloorThreeDeviceFragment /
+    # FloorFourDeviceFragment.setBatteryAndWater): wp in {238, 239, 240} drives
+    # the water-error icon. The S7 Flashdry signals low water this way while
+    # leaving e1/e2/e3 at 0.
+    WP_EMPTY_SENTINELS = (238, 239, 240)
+
     def _parse_fresh_water_status(self, payload: Dict) -> Optional[str]:
         """Parse fresh (clean) water tank status from payload.
 
-        Decoded from the Tineco Android app
-        (FloorFourDeviceFragment.setErrorStatus): warning code 45
-        ("清水箱缺水" / clean-water tank empty) is bit 13 of the ``e3``
-        bitmask (== ``e3 & 8192``).
+        Decoded from the Tineco Android app:
+
+        - ``wp`` is the clean-water tank level percentage. Sentinel values
+          238/239/240 mean empty / "insufficient water" (the app shows a water
+          error icon). The S7 Flashdry uses this and leaves e1/e2/e3 at 0.
+        - ``e3`` is a warning bitmask: bit 13 (``e3 & 8192``) is warning code 45
+          ("清水箱缺水" / clean-water tank empty) on firmware that reports it.
+        - ``e2 == 64`` is the legacy single-value signal on older firmware.
+
+        Any one of these indicating empty wins; we only conclude "full" once
+        every available signal has been checked and none flagged empty.
         """
         if not isinstance(payload, dict):
             return None
 
-        fields = _extract_values(payload, ["e3", "e2"])
+        fields = _extract_values(payload, ["wp", "e3", "e2"])
 
-        # Primary signal: bit 13 of e3 == warning code 45 (clean tank empty).
+        # Primary signal on the S7 Flashdry: wp sentinel == empty / no water.
+        wp = fields.get("wp")
+        if wp is not None:
+            try:
+                if int(wp) in self.WP_EMPTY_SENTINELS:
+                    return "empty"
+            except (ValueError, TypeError):
+                pass
+
+        # e3 warning bitmask: bit 13 == warning code 45 (clean tank empty).
         e3 = fields.get("e3")
         if e3 is not None:
             try:
                 if int(e3) & (1 << 13):
                     return "empty"
-                # e3 present and authoritative; bit clear => tank not empty.
-                return "full"
             except (ValueError, TypeError):
                 pass
 

@@ -13,11 +13,13 @@ A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](h
 
 ### 2.4.0
 
-- **Waste (dirty) water tank status now works.** It was always reporting *Clean*
-  because it read the wrong field. The dirty-water-tank-full warning is decoded
-  from the `e3` bitmask (bit 12, app warning code 44), matching the official
-  Tineco app. Fresh water tank "empty" was corrected the same way (bit 13,
-  code 45). Great for an "empty the tank" reminder automation. (#29)
+- **Water tank statuses now work.** The *waste/dirty* tank was always reporting
+  *Clean* because it read the wrong field — the tank-full warning is decoded from
+  the `e3` bitmask (bit 12, app code 44), matching the official Tineco app. The
+  *fresh/clean* tank now also detects "insufficient water" on the S7 Flashdry,
+  which signals low water via the `wp` level field (sentinel 238/239/240) rather
+  than an error bit. Great for "empty the tank" / "refill water" reminder
+  automations. (#29)
 - **Online sensor no longer flips to *off* by mistake.** The online and charging
   binary sensors used to run their own slow API calls — which timed out, logged
   *"taking over 10 seconds"* warnings, and reported the wrong state. They now
@@ -204,7 +206,11 @@ Device queries used by the integration:
 
 ### Key fields
 
-- `bp` — battery percentage (0–100)
+- `bp` — battery percentage (0–100). Sentinel values 238/239/240 mean "no data / error".
+- `wp` — clean (fresh) water tank level percentage (0–100). Sentinel values
+  238/239/240 mean **empty / insufficient water** (the app shows a water-error
+  icon). This is the primary low-water signal on the S7 Flashdry, where
+  `e1`/`e2`/`e3` stay 0.
 - `wm` — working mode (1=Standby, 2=Charging, 3=In Operation, 8=Self-clean, 9=OTA, 13=Drying)
 - `e3` — primary warning bitmask. Each set bit `n` maps to warning code `n + 32`
   (decoded from the Tineco app). Notably:
@@ -214,7 +220,6 @@ Device queries used by the integration:
   firmware that doesn't report `e3` (`e1 > 0` ≈ waste tank, `e2 == 64` ≈ fresh
   tank empty)
 - `vs` — online flag
-- `wp` — water pressure / percentage
 - `vl` — volume level (1=Low, 2=Medium, 3=High)
 - `ms` — mute status (0=unmuted, 1=muted)
 
