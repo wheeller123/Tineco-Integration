@@ -2,7 +2,7 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-Current version: **2.4.0** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro) work with community feedback.
+Current version: **2.4.1** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro) work with community feedback.
 
 ### Community Lovelace Card
 
@@ -11,7 +11,7 @@ A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](h
 
 ## What's New
 
-### 2.4.0
+### 2.4.1
 
 - **Water tank statuses now work.** Both the *waste/dirty* and *fresh/clean*
   tank sensors now track correctly on the S7 Flashdry, verified against captured

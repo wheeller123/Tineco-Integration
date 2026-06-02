@@ -13,6 +13,8 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+## [v2.4.1] - 2026-06-02
+
 ### Fixed
 - **Water tank statuses (waste/dirty and fresh/clean) not tracking
   empty/full** (#29, S7 Flashdry). Determined empirically from captured
