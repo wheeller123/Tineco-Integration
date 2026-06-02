@@ -13,6 +13,18 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+### Added
+- Release guardrails encoding lessons from past releases:
+  - `scripts/check_release_consistency.py` verifies manifest version is valid
+    semver, `documentation`/`issue_tracker` URLs point at this repo, the README
+    "Current version" matches, the CHANGELOG has the version's section, and
+    (with `--tag`) the tag matches the manifest version.
+  - `validate.yml` runs it on every push/PR (**Release Consistency** job).
+  - `release.yml` runs it with `--tag` on publish and additionally verifies a
+    stable release tag is an ancestor of `main` (pre-releases exempt).
+  - `tests/test_release_consistency.py` exercises the guard logic and fails if
+    the checked-in metadata drifts.
+
 ## [v2.4.2] - 2026-06-02
 
 ### Fixed

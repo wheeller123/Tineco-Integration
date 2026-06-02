@@ -15,6 +15,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # need full history to verify the tag is on main
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
 
       - name: Get version from manifest
         id: version
@@ -22,20 +29,36 @@ jobs:
           version=$(cat custom_components/tineco/manifest.json | jq -r '.version')
           echo "version=$version" >> $GITHUB_OUTPUT
 
-      - name: Validate version matches tag
+      - name: Validate release consistency
+        # Guardrail (lessons learned): tag<->manifest version match, repo URLs,
+        # README version, and CHANGELOG section are all verified by one script
+        # that also runs on every PR. Pre-release suffixes (-rc/-beta/-alpha)
+        # are stripped before the tag/version comparison.
         if: github.event_name == 'release'
         run: |
-          # Strip the leading "v" and any pre-release suffix so that
-          # v2.2.14-rc1 / v2.2.14-beta1 / v2.2.14-alpha1 all validate against
-          # manifest.version = "2.2.14". Pre-release builds keep semantic
-          # versioning while still being gated by this check.
-          raw="${GITHUB_REF#refs/tags/v}"
-          tag_version="${raw%%-*}"
-          manifest_version="${{ steps.version.outputs.version }}"
-          if [ "$tag_version" != "$manifest_version" ]; then
-            echo "Error: Tag version ($tag_version, from $raw) does not match manifest version ($manifest_version)"
-            exit 1
-          fi
+          python scripts/check_release_consistency.py --tag "${GITHUB_REF#refs/tags/}"
+
+      - name: Verify the release tag is on main
+        # Guardrail (lessons learned): releases must be cut from the default
+        # branch, never from a feature branch. Stable releases must be an
+        # ancestor of main; pre-releases (-rc/-beta/-alpha) are exempt so they
+        # can still be tested off a branch.
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          case "$tag" in
+            *-rc*|*-beta*|*-alpha*)
+              echo "Pre-release $tag — skipping on-main check."
+              ;;
+            *)
+              if git merge-base --is-ancestor "$tag" origin/main; then
+                echo "OK: $tag is on main."
+              else
+                echo "Error: stable release $tag is not an ancestor of origin/main. Cut releases from main."
+                exit 1
+              fi
+              ;;
+          esac
 
       - name: Create zip file
         run: |
