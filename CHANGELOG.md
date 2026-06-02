@@ -13,6 +13,18 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+## [v2.4.2] - 2026-06-02
+
+### Fixed
+- `manifest.json` `documentation` and `issue_tracker` URLs (and the README
+  links) pointed at the non-existent `Tineco-HACS-Integration` repo; corrected
+  to `Tineco-Integration`. The HACS "Documentation" / "Issues" buttons now
+  resolve.
+
+### Changed
+- GitHub Actions upgraded off the deprecated Node 20 runtime:
+  `actions/checkout` v3/v4 → v5, `actions/setup-python` v5 → v6.
+
 ## [v2.4.1] - 2026-06-02
 
 ### Fixed

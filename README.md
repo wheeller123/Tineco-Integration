@@ -2,7 +2,7 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-Current version: **2.4.1** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro) work with community feedback.
+Current version: **2.4.2** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro) work with community feedback.
 
 ### Community Lovelace Card
 
@@ -74,7 +74,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 1. Open **HACS** → **Integrations**
 2. Three-dots menu → **Custom repositories**
-3. Add `https://github.com/wheeller123/Tineco-HACS-Integration` with category **Integration**
+3. Add `https://github.com/wheeller123/Tineco-Integration` with category **Integration**
 4. Search for **Tineco** and install
 5. Restart Home Assistant
 6. **Settings** → **Devices & Services** → **Add Integration** → search for **Tineco**
@@ -259,7 +259,7 @@ If something isn't working, please open an issue with logs attached so the cause
 
 4. Back on the integration page, click **Disable debug logging**. Home Assistant will prompt you to save the log file — download it.
 
-**Open the issue here:** https://github.com/wheeller123/Tineco-HACS-Integration/issues — attach the log file and include the integration version, region (`IE` / `US` / `CN` / …), device model, and a short description of what you did. Scrub anything that looks like a token, account ID, or phone number before posting.
+**Open the issue here:** https://github.com/wheeller123/Tineco-Integration/issues — attach the log file and include the integration version, region (`IE` / `US` / `CN` / …), device model, and a short description of what you did. Scrub anything that looks like a token, account ID, or phone number before posting.
 
 
 ## Credits
