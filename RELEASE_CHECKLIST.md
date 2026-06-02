@@ -2,6 +2,27 @@
 
 Five steps. Skip none.
 
+## Automated guardrails (run before you tag)
+
+Most of the manual checks below are now enforced by CI so a release can't
+silently regress. You can run the same static checks locally any time:
+
+```
+python scripts/check_release_consistency.py            # version/URLs/README/CHANGELOG
+python scripts/check_release_consistency.py --tag vX.Y.Z   # also verify the tag
+```
+
+- **`validate.yml` → Release Consistency** runs the no-arg form on every push
+  and PR (manifest version is valid semver; `documentation`/`issue_tracker`
+  URLs point at *this* repo; README "Current version" matches; CHANGELOG has a
+  `## [vX.Y.Z]` section).
+- **`release.yml`** runs `--tag` on publish (tag↔manifest match, suffixes
+  stripped) **and** verifies a stable tag is an ancestor of `main`
+  (pre-releases are exempt so they can be tested off a branch).
+
+If CI is green these are already satisfied; the steps below are the human
+judgement parts.
+
 ## 1. Tests pass
 
 ```

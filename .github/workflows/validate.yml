@@ -44,3 +44,21 @@ jobs:
       - name: Lint with ruff
         run: |
           ruff check custom_components/tineco
+
+  release-consistency:
+    # Guardrail (lessons learned): keep manifest version / repo URLs /
+    # README version / CHANGELOG in sync on every push & PR, so the next
+    # release can't ship a version mismatch or broken HACS links.
+    name: Release Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Check release consistency
+        run: python scripts/check_release_consistency.py
