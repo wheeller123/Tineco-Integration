@@ -13,14 +13,13 @@ A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](h
 
 ### 2.4.0
 
-- **Water tank statuses now work.** The *waste/dirty* tank was always reporting
-  *Clean* because it read the wrong field — the tank-full warning is decoded from
-  the `e3` bitmask (bit 12, app code 44), matching the official Tineco app. The
-  *fresh/clean* tank now correctly tracks empty/full on the S7 Flashdry: the
-  empty/"insufficient water" state is the `e2` bit `64` (set as `wp` flips from
-  238 with-water to 239 empty), verified against a captured full→empty
-  transition. Great for "empty the tank" / "refill water" reminder
-  automations. (#29)
+- **Water tank statuses now work.** Both the *waste/dirty* and *fresh/clean*
+  tank sensors now track correctly on the S7 Flashdry, verified against captured
+  full↔empty transitions. The `e2` field is a bitmask: bit `256` = waste tank
+  full, bit `64` = fresh tank empty (the fresh tank also corroborates via the
+  `wp` level flipping 238→239). Previously the waste tank was stuck on *Clean*
+  and the fresh tank didn't track properly. Great for "empty the tank" /
+  "refill water" reminder automations. (#29)
 - **Online sensor no longer flips to *off* by mistake.** The online and charging
   binary sensors used to run their own slow API calls — which timed out, logged
   *"taking over 10 seconds"* warnings, and reported the wrong state. They now
@@ -208,18 +207,21 @@ Device queries used by the integration:
 ### Key fields
 
 - `bp` — battery percentage (0–100). Sentinel values 238/239/240 mean "no data / error".
+- `e2` — tank-condition **bitmask** (primary signal on the S7 Flashdry, verified
+  from captured transitions):
+  - bit `64` (`e2 & 64`) — **fresh / clean water tank empty**
+  - bit `256` (`e2 & 256`) — **waste / dirty water tank full**
+  - the two bits are independent and can be set together
 - `wp` — clean (fresh) water tank level indicator. On the S7 Flashdry it
-  reports `238` when water is present and flips to `239` when empty. The
-  empty/insufficient-water state is confirmed by `e2` bit `64` (set together
-  with `wp=239`). `wp=238` is **not** an empty sentinel.
+  reports `238` when water is present and flips to `239` when empty (a
+  corroborating signal alongside `e2 & 64`). `wp=238` is **not** an empty
+  sentinel.
 - `wm` — working mode (1=Standby, 2=Charging, 3=In Operation, 8=Self-clean, 9=OTA, 13=Drying)
-- `e3` — primary warning bitmask. Each set bit `n` maps to warning code `n + 32`
-  (decoded from the Tineco app). Notably:
-  - bit 12 (`e3 & 4096`, code 44) — **waste / dirty water tank full**
-  - bit 13 (`e3 & 8192`, code 45) — **fresh / clean water tank empty**
-- `e1` / `e2` — legacy single-value error codes used as a fallback on older
-  firmware that doesn't report `e3` (`e1 > 0` ≈ waste tank, `e2 == 64` ≈ fresh
-  tank empty)
+- `e3` — alternate warning bitmask used by some firmware. Each set bit `n` maps
+  to warning code `n + 32` (decoded from the Tineco app). Notably:
+  - bit 12 (`e3 & 4096`, code 44) — waste / dirty water tank full
+  - bit 13 (`e3 & 8192`, code 45) — fresh / clean water tank empty
+- `e1` — legacy single-value waste-tank fallback (`e1 > 0`) on older firmware
 - `vs` — online flag
 - `vl` — volume level (1=Low, 2=Medium, 3=High)
 - `ms` — mute status (0=unmuted, 1=muted)

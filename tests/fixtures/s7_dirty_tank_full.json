@@ -1,0 +1,47 @@
+{
+  "_source": "Captured 2026-06-02 from a maintainer S7 Flashdry, dirty/waste water tank FULL state, during a transition test (c:/Temp/latest-4.txt log line 446). gci payload values are real; device metadata matches the known S7 Flashdry shape. PII (did/email/tokens) scrubbed.",
+  "_regression_note": "Real transition: dirty tank not full = e2=0; dirty tank FULL = e2=256 (this fixture). e2 is a bitmask: bit 256 = waste/dirty tank full, bit 64 = fresh/clean tank empty. The waste water tank sensor must report 'full' here. It previously only checked e1/e3 (both 0) and short-circuited to 'clean'.",
+  "devices": [
+    {
+      "catalog": "FLOOR",
+      "className": "9uened",
+      "company": "TEK",
+      "did": "00000000-0000-0000-0000-000000000004",
+      "name": "0000000tl2uvmb8j1580",
+      "nick": "Floor One-1580",
+      "productType": "S7 Flashdry",
+      "resource": "T033"
+    }
+  ],
+  "info": {
+    "gci": {
+      "selectmode": 3,
+      "wheel": 2,
+      "cleanway": 1,
+      "led": 0,
+      "msr": 0,
+      "vl": 1,
+      "wp": 238,
+      "wm": 10,
+      "dv": 0,
+      "bp": 67,
+      "vs": 1,
+      "e1": 0,
+      "e2": 256,
+      "e3": 0
+    },
+    "gav": {
+      "vv": "1.0.5",
+      "tv": "1.2.3",
+      "pv": "1.0.0",
+      "av": "v3"
+    },
+    "cfp": {
+      "wm": 10,
+      "bp": 67,
+      "wp": 238,
+      "e1": 0,
+      "e2": 256
+    }
+  }
+}

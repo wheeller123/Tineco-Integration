@@ -14,22 +14,23 @@ Two rules for contributors:
 ## [Unreleased]
 
 ### Fixed
-- **Fresh (clean) water tank status not tracking empty/full correctly**
-  (S7 Flashdry). Determined empirically from a captured full→empty transition:
-  water present reports `wp=238, e2=0`; empty / "insufficient water" reports
-  `wp=239, e2=64`. The definitive empty signal is the `e2` bit 64, corroborated
-  by `wp` flipping 238→239. The sensor now reports `empty` on `e2 & 64`
-  (or the `e3` bit-13 warning, or `wp` in {239, 240}) and `full` otherwise.
-  Note: `wp=238` is the *has-water* value — a brief earlier pre-release
-  (rc2) wrongly treated 238/239/240 as "empty" and so got stuck reporting
-  empty; that is corrected here.
-- **Waste (dirty) water tank status always showing "Clean"** (#29). The sensor
-  keyed off the `e1` field, but the dirty-water-tank-full warning (app code 44)
-  is actually bit 12 of the `e3` bitmask (`e3 & 4096`). Decoded from the Tineco
-  Android app (`FloorFourDeviceFragment.setErrorStatus`). The fresh water tank
-  sensor was corrected the same way: empty (code 45) is bit 13 of `e3`
-  (`e3 & 8192`). The old `e1`/`e2` checks remain as a fallback for firmware that
-  doesn't report `e3`.
+- **Water tank statuses (waste/dirty and fresh/clean) not tracking
+  empty/full** (#29, S7 Flashdry). Determined empirically from captured
+  full↔empty transitions: `e2` is a **bitmask** of tank conditions —
+  `e2 & 64` = fresh/clean tank empty, `e2 & 256` = waste/dirty tank full —
+  while `e1`/`e3` stay 0 on this firmware. The fresh tank also corroborates
+  via the `wp` level reading flipping from 238 (has water) to 239 (empty);
+  `wp=238` is the *has-water* value, not an empty sentinel. The sensors now:
+    - waste/dirty: `full` on `e2 & 256` (or `e3` bit-12 warning code 44, or
+      legacy `e1 > 0`), else `clean`.
+    - fresh/clean: `empty` on `e2 & 64` (or `e3` bit-13 warning code 45, or
+      `wp` in {239, 240}), else `full`.
+  Both sensors check every available signal before concluding the
+  not-triggered state (a prior short-circuit on `e3` hid the real `e2`
+  signal), and the two `e2` bits are independent so they never cross-trigger.
+  The `e3`/`e1` paths remain for firmware that reports tank state that way.
+  (An earlier pre-release wrongly treated `wp` 238/239/240 as "empty" and got
+  stuck reporting empty; corrected here.)
 - **Online binary sensor reported "on" at startup then flipped "off" regardless
   of actual state**, with repeated `Update of binary_sensor...online is taking
   over 10 seconds` warnings. The online/charging binary sensors no longer issue
