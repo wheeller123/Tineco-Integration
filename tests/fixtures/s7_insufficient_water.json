@@ -1,6 +1,6 @@
 {
-  "_source": "Captured 2026-06-02 from a maintainer/community S7 Flashdry showing 'Insufficient water' in the Tineco app (home-assistant_tineco log line 544). gci payload values are real; device metadata matches the known S7 Flashdry shape. PII (did/email/tokens) scrubbed.",
-  "_regression_note": "The device reports insufficient/low clean water via the wp sentinel (wp=238) while e1/e2/e3 are all 0. Decoded from the Tineco app (FloorThreeDeviceFragment/FloorFourDeviceFragment.setBatteryAndWater): wp in {238,239,240} drives the water-error icon. The fresh water tank sensor must report 'empty' here; previously it only checked e2/e3 and wrongly reported 'full'.",
+  "_source": "Captured 2026-06-02 from a maintainer S7 Flashdry, EMPTY state, during a full→empty transition test (home-assistant_tineco log 18-50). gci payload values are real; device metadata matches the known S7 Flashdry shape. PII (did/email/tokens) scrubbed.",
+  "_regression_note": "Real full→empty transition: water present = wp=238,e2=0 (full); empty/insufficient = wp=239,e2=64 (this fixture). The definitive empty signal is e2 bit 64, corroborated by wp flipping 238→239. wp=238 is the HAS-WATER value, NOT an empty sentinel — an earlier build wrongly mapped 238/239/240→empty and got stuck on empty. The fresh water tank sensor must report 'empty' here.",
   "devices": [
     {
       "catalog": "FLOOR",
@@ -20,14 +20,14 @@
       "cleanway": 1,
       "led": 0,
       "msr": 0,
-      "vl": 3,
-      "wp": 238,
+      "vl": 1,
+      "wp": 239,
       "wm": 3,
       "dv": 0,
-      "bp": 86,
+      "bp": 79,
       "vs": 1,
       "e1": 0,
-      "e2": 0,
+      "e2": 64,
       "e3": 0
     },
     "gav": {
@@ -38,10 +38,10 @@
     },
     "cfp": {
       "wm": 3,
-      "bp": 86,
-      "wp": 238,
+      "bp": 79,
+      "wp": 239,
       "e1": 0,
-      "e2": 0
+      "e2": 64
     }
   }
 }

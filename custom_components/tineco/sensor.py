@@ -607,44 +607,41 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
             _LOGGER.error(f"Error parsing fresh water tank status: {err}", exc_info=True)
             self._state = "full"
 
-    # ``wp`` (clean water tank level %) reports these sentinel values when the
-    # tank is empty / "insufficient water" instead of a 0-100 percentage.
-    # Decoded from the Tineco Android app (FloorThreeDeviceFragment /
-    # FloorFourDeviceFragment.setBatteryAndWater): wp in {238, 239, 240} drives
-    # the water-error icon. The S7 Flashdry signals low water this way while
-    # leaving e1/e2/e3 at 0.
-    WP_EMPTY_SENTINELS = (238, 239, 240)
-
     def _parse_fresh_water_status(self, payload: Dict) -> Optional[str]:
         """Parse fresh (clean) water tank status from payload.
 
-        Decoded from the Tineco Android app:
+        Determined empirically from a captured S7 Flashdry full→empty
+        transition (filling the tank then running until the "insufficient
+        water" icon appeared):
 
-        - ``wp`` is the clean-water tank level percentage. Sentinel values
-          238/239/240 mean empty / "insufficient water" (the app shows a water
-          error icon). The S7 Flashdry uses this and leaves e1/e2/e3 at 0.
-        - ``e3`` is a warning bitmask: bit 13 (``e3 & 8192``) is warning code 45
-          ("清水箱缺水" / clean-water tank empty) on firmware that reports it.
-        - ``e2 == 64`` is the legacy single-value signal on older firmware.
+            water present:  wp=238, e2=0   → full
+            empty / low:    wp=239, e2=64  → empty
 
-        Any one of these indicating empty wins; we only conclude "full" once
-        every available signal has been checked and none flagged empty.
+        So the definitive empty signal is ``e2 == 64`` (the dirty/clean-water
+        warning bit), corroborated by the ``wp`` level reading flipping from
+        238 (has water) to 239 (no water). ``wp=238`` is the *has-water*
+        value, **not** an empty sentinel — an earlier build wrongly treated
+        238/239/240 as "empty" and got stuck reporting empty.
+
+        ``e3`` bit 13 (warning code 45) is also honoured for firmware that
+        reports tank state through the e3 bitmask instead.
         """
         if not isinstance(payload, dict):
             return None
 
-        fields = _extract_values(payload, ["wp", "e3", "e2"])
+        fields = _extract_values(payload, ["e2", "e3", "wp"])
 
-        # Primary signal on the S7 Flashdry: wp sentinel == empty / no water.
-        wp = fields.get("wp")
-        if wp is not None:
+        # Definitive signal on the S7 Flashdry: e2 bit 64 == clean tank empty.
+        e2 = fields.get("e2")
+        if e2 is not None:
             try:
-                if int(wp) in self.WP_EMPTY_SENTINELS:
+                if int(e2) & 64:
                     return "empty"
             except (ValueError, TypeError):
                 pass
 
-        # e3 warning bitmask: bit 13 == warning code 45 (clean tank empty).
+        # e3 warning bitmask: bit 13 == warning code 45 (clean tank empty)
+        # on firmware that reports tank state this way.
         e3 = fields.get("e3")
         if e3 is not None:
             try:
@@ -653,11 +650,11 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
             except (ValueError, TypeError):
                 pass
 
-        # Legacy fallback for firmware that reported the older e2 field.
-        e2 = fields.get("e2")
-        if e2 is not None:
+        # Corroborating signal: wp flips 238 (has water) → 239/240 (no water).
+        wp = fields.get("wp")
+        if wp is not None:
             try:
-                if int(e2) == 64:
+                if int(wp) in (239, 240):
                     return "empty"
             except (ValueError, TypeError):
                 pass

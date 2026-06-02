@@ -174,20 +174,31 @@ def test_water_tank_clean_when_e3_bit_12_clear():
     assert sensor._state == "clean"
 
 
-def test_fresh_water_tank_full_when_no_empty_signal_present():
-    """A normal wp percentage with no e2/e3 empty flags → 'full'."""
+def test_fresh_water_tank_full_when_water_present():
+    """Captured S7 Flashdry 'has water' state: wp=238, e2=0 → 'full'.
+    (wp=238 is the has-water reading, NOT an empty sentinel.)"""
     sensor = make_sensor(TinecoFreshWaterTankSensor)
 
-    sensor._update_state_from_data({"gci": {"wp": 90, "e1": 0, "e2": 0, "e3": 0}})
+    sensor._update_state_from_data({"gci": {"wp": 238, "e1": 0, "e2": 0, "e3": 0}})
 
     assert sensor._state == "full"
 
 
 def test_fresh_water_tank_empty_when_e2_is_64():
-    """Legacy fallback: older firmware reporting e2==64 still flips to 'empty'."""
+    """Definitive S7 Flashdry empty signal: e2 bit 64 set → 'empty'."""
     sensor = make_sensor(TinecoFreshWaterTankSensor)
 
     sensor._update_state_from_data({"gci": {"e2": 64}})
+
+    assert sensor._state == "empty"
+
+
+def test_fresh_water_tank_empty_from_s7_transition(load_fixture):
+    """Real S7 Flashdry full→empty capture: empty state is wp=239, e2=64."""
+    fx = load_fixture("s7_insufficient_water")
+    sensor = make_sensor(TinecoFreshWaterTankSensor, devices=fx["devices"])
+
+    sensor._update_state_from_data(fx["info"])
 
     assert sensor._state == "empty"
 
@@ -202,45 +213,22 @@ def test_fresh_water_tank_empty_from_e3_bit_13(load_fixture):
     assert sensor._state == "empty"
 
 
+def test_fresh_water_tank_empty_from_wp_239():
+    """wp flips to 239 (no water) → 'empty' even if e2/e3 are absent."""
+    sensor = make_sensor(TinecoFreshWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"wp": 239, "e1": 0, "e3": 0}})
+
+    assert sensor._state == "empty"
+
+
 def test_fresh_water_tank_full_when_no_empty_signal():
-    """No wp sentinel, e3 bit 13 clear, no legacy e2 → 'full'."""
+    """No e2/e3 empty flag and wp at the has-water value → 'full'."""
     sensor = make_sensor(TinecoFreshWaterTankSensor)
 
-    sensor._update_state_from_data({"gci": {"e3": 4096}})
+    sensor._update_state_from_data({"gci": {"wp": 238, "e3": 4096}})
 
     assert sensor._state == "full"
-
-
-@pytest.mark.parametrize("wp", [238, 239, 240])
-def test_fresh_water_tank_empty_from_wp_sentinel(wp):
-    """Issue: S7 Flashdry signals 'insufficient water' via wp sentinel
-    (238/239/240) while leaving e1/e2/e3 at 0. Must report 'empty'."""
-    sensor = make_sensor(TinecoFreshWaterTankSensor)
-
-    sensor._update_state_from_data({"gci": {"wp": wp, "e1": 0, "e2": 0, "e3": 0}})
-
-    assert sensor._state == "empty"
-
-
-def test_fresh_water_tank_full_when_wp_is_normal_percentage():
-    """A normal wp percentage (not a sentinel) with no other empty signal
-    means the tank has water → 'full'."""
-    sensor = make_sensor(TinecoFreshWaterTankSensor)
-
-    sensor._update_state_from_data({"gci": {"wp": 80, "e1": 0, "e2": 0, "e3": 0}})
-
-    assert sensor._state == "full"
-
-
-def test_fresh_water_tank_empty_from_s7_insufficient_water_fixture(load_fixture):
-    """Real S7 Flashdry capture: app shows 'Insufficient water', gci has
-    wp=238 with e1/e2/e3 all 0 → sensor must report 'empty'."""
-    fx = load_fixture("s7_insufficient_water")
-    sensor = make_sensor(TinecoFreshWaterTankSensor, devices=fx["devices"])
-
-    sensor._update_state_from_data(fx["info"])
-
-    assert sensor._state == "empty"
 
 
 def test_brush_roller_normal_when_no_br_field(load_fixture):
