@@ -145,11 +145,33 @@ def test_water_tank_clean_when_e1_zero(load_fixture):
 
 
 def test_water_tank_full_when_e1_nonzero():
+    """Legacy fallback: firmware that only reports e1 still flips to 'full'."""
     sensor = make_sensor(TinecoWaterTankSensor)
 
     sensor._update_state_from_data({"gci": {"e1": 1}})
 
     assert sensor._state == "full"
+
+
+def test_water_tank_full_from_e3_bit_12(load_fixture):
+    """Issue #29: waste/dirty tank full is encoded as warning code 44,
+    i.e. bit 12 of the e3 bitmask (e3 & 4096)."""
+    fx = load_fixture("s5_tanks_warning")
+    sensor = make_sensor(TinecoWaterTankSensor, devices=fx["devices"])
+
+    sensor._update_state_from_data(fx["info"])
+
+    assert sensor._state == "full"
+
+
+def test_water_tank_clean_when_e3_bit_12_clear():
+    """e3 present but bit 12 clear is authoritative → 'clean',
+    even if an unrelated e1 value is set."""
+    sensor = make_sensor(TinecoWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"e1": 1, "e3": 8192}})
+
+    assert sensor._state == "clean"
 
 
 def test_fresh_water_tank_full_when_e2_zero(load_fixture):
@@ -162,11 +184,31 @@ def test_fresh_water_tank_full_when_e2_zero(load_fixture):
 
 
 def test_fresh_water_tank_empty_when_e2_is_64():
+    """Legacy fallback: older firmware reporting e2==64 still flips to 'empty'."""
     sensor = make_sensor(TinecoFreshWaterTankSensor)
 
     sensor._update_state_from_data({"gci": {"e2": 64}})
 
     assert sensor._state == "empty"
+
+
+def test_fresh_water_tank_empty_from_e3_bit_13(load_fixture):
+    """Clean/fresh tank empty is warning code 45, i.e. bit 13 of e3 (e3 & 8192)."""
+    fx = load_fixture("s5_tanks_warning")
+    sensor = make_sensor(TinecoFreshWaterTankSensor, devices=fx["devices"])
+
+    sensor._update_state_from_data(fx["info"])
+
+    assert sensor._state == "empty"
+
+
+def test_fresh_water_tank_full_when_e3_bit_13_clear():
+    """e3 present but bit 13 clear is authoritative → 'full'."""
+    sensor = make_sensor(TinecoFreshWaterTankSensor)
+
+    sensor._update_state_from_data({"gci": {"e3": 4096}})
+
+    assert sensor._state == "full"
 
 
 def test_brush_roller_normal_when_no_br_field(load_fixture):

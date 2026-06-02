@@ -13,6 +13,27 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+### Fixed
+- **Waste (dirty) water tank status always showing "Clean"** (#29). The sensor
+  keyed off the `e1` field, but the dirty-water-tank-full warning (app code 44)
+  is actually bit 12 of the `e3` bitmask (`e3 & 4096`). Decoded from the Tineco
+  Android app (`FloorFourDeviceFragment.setErrorStatus`). The fresh water tank
+  sensor was corrected the same way: empty (code 45) is bit 13 of `e3`
+  (`e3 & 8192`). The old `e1`/`e2` checks remain as a fallback for firmware that
+  doesn't report `e3`.
+- **Online binary sensor reported "on" at startup then flipped "off" regardless
+  of actual state**, with repeated `Update of binary_sensor...online is taking
+  over 10 seconds` warnings. The online/charging binary sensors no longer issue
+  their own independent IoT queries; they now derive state from the shared
+  `DataUpdateCoordinator` (online = the last refresh succeeded). This removes the
+  duplicate per-entity API calls and the false state flip.
+- **`gcf` (Get Config File) read timeouts spamming the log every refresh** as
+  `ERROR ... Read timed out. (read timeout=10)`. This upstream endpoint is
+  intermittently unresponsive; it is now best-effort with a shorter (4s) timeout,
+  and a per-action timeout is logged once as a `WARNING` instead of an `ERROR`
+  every cycle. Core state comes from `gci`/`QueryMode`, so a `gcf` timeout no
+  longer slows or fails the refresh. (#29)
+
 ### Added
 - Pytest unit-test suite under `tests/` covering sensor field-priority logic,
   region/URL construction, entity unique-id stability, and the HA config-flow

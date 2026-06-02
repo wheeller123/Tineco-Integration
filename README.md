@@ -2,11 +2,33 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-Current version: **2.3.0** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models may work with community feedback.
+Current version: **2.4.0** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro) work with community feedback.
 
 ### Community Lovelace Card
 
 A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](https://github.com/MattiaSaiko/lovelace-tineco-card)
+
+
+## What's New
+
+### 2.4.0
+
+- **Waste (dirty) water tank status now works.** It was always reporting *Clean*
+  because it read the wrong field. The dirty-water-tank-full warning is decoded
+  from the `e3` bitmask (bit 12, app warning code 44), matching the official
+  Tineco app. Fresh water tank "empty" was corrected the same way (bit 13,
+  code 45). Great for an "empty the tank" reminder automation. (#29)
+- **Online sensor no longer flips to *off* by mistake.** The online and charging
+  binary sensors used to run their own slow API calls — which timed out, logged
+  *"taking over 10 seconds"* warnings, and reported the wrong state. They now
+  follow the integration's shared update cycle: online simply reflects whether the
+  last poll reached the device.
+- **Quieter, faster polling.** The occasionally-unresponsive `gcf` request is now
+  best-effort with a short timeout, and its repeated `Read timed out` messages are
+  no longer logged as errors every cycle. Device state comes from the other
+  endpoints, so a `gcf` hiccup no longer slows down or fails a refresh. (#29)
+
+See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 
 ## Features
@@ -184,9 +206,13 @@ Device queries used by the integration:
 
 - `bp` — battery percentage (0–100)
 - `wm` — working mode (1=Standby, 2=Charging, 3=In Operation, 8=Self-clean, 9=OTA, 13=Drying)
-- `e1` — error code 1 (waste water tank)
-- `e2` — error code 2 (`64` = fresh water tank empty)
-- `e3` — error code 3 (other)
+- `e3` — primary warning bitmask. Each set bit `n` maps to warning code `n + 32`
+  (decoded from the Tineco app). Notably:
+  - bit 12 (`e3 & 4096`, code 44) — **waste / dirty water tank full**
+  - bit 13 (`e3 & 8192`, code 45) — **fresh / clean water tank empty**
+- `e1` / `e2` — legacy single-value error codes used as a fallback on older
+  firmware that doesn't report `e3` (`e1 > 0` ≈ waste tank, `e2 == 64` ≈ fresh
+  tank empty)
 - `vs` — online flag
 - `wp` — water pressure / percentage
 - `vl` — volume level (1=Low, 2=Medium, 3=High)

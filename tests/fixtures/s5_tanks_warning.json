@@ -1,0 +1,46 @@
+{
+  "_source": "Synthetic fixture for issue #29. Models a Floor One S5 reporting both tank warnings simultaneously via the e3 bitmask. Field semantics decoded from the Tineco Android app (FloorFourDeviceFragment.setErrorStatus): warning code = bit_index + 32, kept for 44-47.",
+  "_regression_note": "e3 = 4096 | 8192 = 12288 sets bit 12 (code 44 = waste/dirty water tank full) and bit 13 (code 45 = clean/fresh water tank empty). The waste water tank sensor must report 'full' and the fresh water tank sensor must report 'empty'. Previously the waste sensor keyed off e1 and always reported 'clean' (issue #29).",
+  "devices": [
+    {
+      "catalog": "FLOOR",
+      "className": "9uened",
+      "company": "TEK",
+      "did": "00000000-0000-0000-0000-000000000002",
+      "name": "0000000tl2uvmb8j5500",
+      "nick": "Floor One-5500",
+      "productType": "Floor One S5",
+      "resource": "T033"
+    }
+  ],
+  "info": {
+    "gci": {
+      "selectmode": 0,
+      "wheel": 2,
+      "cleanway": 1,
+      "led": 0,
+      "msr": 0,
+      "vl": 1,
+      "wm": 8,
+      "dv": 0,
+      "bp": 88,
+      "vs": 1,
+      "e1": 0,
+      "e2": 0,
+      "e3": 12288
+    },
+    "gav": {
+      "vv": "1.0.5",
+      "tv": "1.2.3",
+      "pv": "1.0.0",
+      "av": "v3"
+    },
+    "cfp": {
+      "wm": 8,
+      "bp": 88,
+      "e1": 0,
+      "e2": 0,
+      "e3": 12288
+    }
+  }
+}

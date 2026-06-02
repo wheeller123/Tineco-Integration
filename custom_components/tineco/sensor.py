@@ -527,22 +527,39 @@ class TinecoWaterTankSensor(TinecoBaseSensor):
             self._state = "clean"
 
     def _parse_water_tank_status(self, payload: Dict) -> Optional[str]:
-        """Parse waste water tank status from payload."""
+        """Parse waste (dirty) water tank status from payload.
+
+        Decoded from the Tineco Android app
+        (FloorFourDeviceFragment.setErrorStatus): tank/station warnings are a
+        bitmask in the ``e3`` field. Each set bit ``n`` maps to warning code
+        ``n + 32``; code 44 ("污水箱状态异常" / dirty-water tank abnormal) is
+        therefore ``e3 & (1 << 12)`` (== ``e3 & 4096``).
+        """
         if not isinstance(payload, dict):
             return None
 
-        fields = _extract_values(payload, ["e1", "mdt"])
-        
-        # Check e1 field if it exists (might indicate waste tank issue)
+        fields = _extract_values(payload, ["e3", "e1"])
+
+        # Primary signal: bit 12 of e3 == warning code 44 (waste tank full).
+        e3 = fields.get("e3")
+        if e3 is not None:
+            try:
+                if int(e3) & (1 << 12):
+                    return "full"
+                # e3 is present and authoritative; bit clear => tank not full.
+                return "clean"
+            except (ValueError, TypeError):
+                pass
+
+        # Legacy fallback for firmware that only reports the older e1 field.
         e1 = fields.get("e1")
         if e1 is not None:
             try:
-                error_code = int(e1)
-                if error_code > 0:
+                if int(e1) > 0:
                     return "full"
             except (ValueError, TypeError):
                 pass
-        
+
         return "clean"
     
     @property
@@ -591,22 +608,38 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
             self._state = "full"
 
     def _parse_fresh_water_status(self, payload: Dict) -> Optional[str]:
-        """Parse fresh water tank status from payload."""
+        """Parse fresh (clean) water tank status from payload.
+
+        Decoded from the Tineco Android app
+        (FloorFourDeviceFragment.setErrorStatus): warning code 45
+        ("清水箱缺水" / clean-water tank empty) is bit 13 of the ``e3``
+        bitmask (== ``e3 & 8192``).
+        """
         if not isinstance(payload, dict):
             return None
 
-        fields = _extract_values(payload, ["e2"])
-        
-        # Check e2 field: 64 = fresh water tank empty
+        fields = _extract_values(payload, ["e3", "e2"])
+
+        # Primary signal: bit 13 of e3 == warning code 45 (clean tank empty).
+        e3 = fields.get("e3")
+        if e3 is not None:
+            try:
+                if int(e3) & (1 << 13):
+                    return "empty"
+                # e3 present and authoritative; bit clear => tank not empty.
+                return "full"
+            except (ValueError, TypeError):
+                pass
+
+        # Legacy fallback for firmware that reported the older e2 field.
         e2 = fields.get("e2")
         if e2 is not None:
             try:
-                error_code = int(e2)
-                if error_code == 64:
+                if int(e2) == 64:
                     return "empty"
             except (ValueError, TypeError):
                 pass
-        
+
         return "full"
     
     @property

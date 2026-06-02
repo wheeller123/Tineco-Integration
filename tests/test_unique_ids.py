@@ -79,14 +79,15 @@ def test_switch_unique_id(cls_name, suffix):
 
 
 # ---------------------------------------------------------------------------
-# Binary sensor platform — concrete signature: (config_entry, hass)
+# Binary sensor platform — concrete signature: (config_entry, hass, coordinator)
+#
+# These are now CoordinatorEntity-based (state derived from the shared
+# DataUpdateCoordinator rather than per-entity IoT polling).
 # ---------------------------------------------------------------------------
 
 BINARY_SENSOR_EXPECTED_SUFFIXES = [
     ("TinecoDeviceOnlineSensor",   "online"),
     ("TinecoChargingSensor",       "charging"),
-    ("TinecoCleanWaterTankSensor", "clean_water_tank"),
-    ("TinecoDirtyWaterTankSensor", "dirty_water_tank"),
 ]
 
 
@@ -95,7 +96,7 @@ def test_binary_sensor_unique_id(cls_name, suffix):
     from custom_components.tineco import binary_sensor as bs_mod
 
     cls = getattr(bs_mod, cls_name)
-    instance = cls(_make_entry(), _make_fake_hass())
+    instance = cls(_make_entry(), _make_fake_hass(), coordinator=MagicMock())
 
     assert instance._attr_unique_id == f"{DOMAIN}_{EMAIL}_{suffix}"
 
