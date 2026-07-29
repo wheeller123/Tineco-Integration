@@ -4,9 +4,10 @@ These lock the CN-vs-WW host split (``-appapi.tineco.com`` vs
 ``-api.tineco.com``) and the IoT-login ``org`` value (``TEK`` vs ``TEKWW``)
 — the two axes most likely to break silently when adding a new region.
 
-The class instantiates a ``TinecoClient`` directly, which triggers a real DC
-lookup HTTP call to ``api-base.robot{ww,cn}.ecouser.net``. To keep these
-tests hermetic and offline we mock ``requests.Session.get`` for the duration.
+Constructing a ``TinecoClient`` does no I/O — the DC lookup is deferred to the
+first read of ``dc`` / ``IOT_API_BASE`` / ``IOT_LOGIN_ENDPOINT`` (see
+``test_construction_does_no_network_io``). Tests that do read those mock
+``requests.Session.get`` so they stay hermetic and offline.
 """
 from __future__ import annotations
 
@@ -95,3 +96,41 @@ def test_dc_fallback_for_known_regions(offline_dc_lookup):
     assert TinecoClient(region="JP")._resolve_iot_datacenter() == "as"
     # IE is not in REGION_DC_MAP so falls back to "eu" — that's intentional.
     assert TinecoClient(region="IE")._resolve_iot_datacenter() == "eu"
+
+
+def test_construction_does_no_network_io():
+    """Regression lock for the HA event-loop blocking-call warning.
+
+    ``TinecoClient.__init__`` used to call ``_resolve_iot_datacenter()``, which
+    does a blocking ``requests`` GET. Home Assistant constructs the client on
+    the event loop, so that tripped ``homeassistant.util.loop`` detection
+    (``Detected blocking call to load_verify_locations``). Construction must
+    stay pure; the lookup happens lazily on first IoT-endpoint use.
+    """
+    with patch("custom_components.tineco.tineco_client_impl.requests.Session.get") as m:
+        m.side_effect = AssertionError("DC lookup must not run during __init__")
+        client = TinecoClient(region="IE")
+
+    assert m.call_count == 0, "constructor performed HTTP I/O"
+    assert client._dc is None, "datacenter should be unresolved until first use"
+
+
+def test_dc_resolved_lazily_and_cached(offline_dc_lookup):
+    """First IoT-endpoint read resolves the DC; later reads reuse the cache."""
+    client = TinecoClient(region="US")
+    assert offline_dc_lookup.call_count == 0
+
+    assert client.IOT_API_BASE == (
+        "https://api-ngiot.dc-na.ww.ecouser.net/api/iot/endpoint/control"
+    )
+    first_calls = offline_dc_lookup.call_count
+    assert first_calls > 0, "first endpoint read should trigger the lookup"
+
+    assert client.IOT_LOGIN_ENDPOINT == "https://api-base.dc-na.ww.ecouser.net/api/users/user.do"
+    assert offline_dc_lookup.call_count == first_calls, "DC lookup was not cached"
+
+
+def test_cn_endpoints_use_cn_vendor(offline_dc_lookup):
+    """CN builds ``dc-cn.cn`` hosts; WW builds ``dc-<dc>.ww``."""
+    assert "dc-cn.cn.ecouser.net" in TinecoClient(region="CN").IOT_LOGIN_ENDPOINT
+    assert "dc-eu.ww.ecouser.net" in TinecoClient(region="IE").IOT_LOGIN_ENDPOINT

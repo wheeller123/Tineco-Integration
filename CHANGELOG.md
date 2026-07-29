@@ -13,6 +13,31 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+## [v2.4.3] - 2026-07-29
+
+### Fixed
+- Blocking calls in the Home Assistant event loop during startup (reported as
+  `Detected blocking call to load_verify_locations ... tineco_client_impl.py,
+  line 134`). `TinecoClient.__init__` resolved the IoT datacenter with a
+  synchronous `requests` GET, and the constructor was invoked on the event loop
+  from `async_setup_entry` → `async_login`, from `TinecoConfigFlow.__init__`,
+  and from the `switch`/`select` client-fallback paths.
+  - The datacenter lookup is now lazy: `IOT_API_BASE` / `IOT_LOGIN_ENDPOINT`
+    are properties resolving `dc` on first read (cached, thread-safe), and
+    `login()` warms it while already in an executor. Construction does no I/O.
+  - `TinecoDeviceClient` takes `hass` and dispatches every blocking call via
+    `hass.async_add_executor_job`, replacing the deprecated
+    `asyncio.get_event_loop().run_in_executor` (removed in favour of the HA
+    helper; `get_event_loop` warns from Python 3.12).
+  - `TinecoConfigFlow.__init__` no longer builds a throwaway client just to read
+    a device ID — it reads the new `TinecoClient.DEFAULT_DEVICE_ID` constant
+    (same value as before, so login signatures are unchanged). The real client
+    is constructed inside the executor alongside `login()`.
+  - The seven duplicated client-fallback blocks in `switch.py` / `select.py` are
+    replaced by `client.async_get_or_create_client()`, which always passes
+    `hass`, `device_id` and `region` (the fallbacks previously dropped the last
+    two, silently logging in against the default device ID and region `IE`).
+
 ### Added
 - Release guardrails encoding lessons from past releases:
   - `scripts/check_release_consistency.py` verifies manifest version is valid

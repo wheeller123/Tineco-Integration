@@ -85,18 +85,13 @@ class TinecoBaseSwitch(SwitchEntity):
     async def async_update(self):
         """Update switch state."""
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.debug("Failed to login during update")
-                    return
+                _LOGGER.debug("Failed to login during update")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
@@ -135,18 +130,13 @@ class TinecoDevicePowerSwitch(TinecoBaseSwitch):
     async def _send_command(self, on: bool):
         """Send power command to device."""
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error("Failed to login for power command")
-                    return
+                _LOGGER.error("Failed to login for power command")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
@@ -194,18 +184,13 @@ class TinecoAudioSwitch(TinecoBaseSwitch):
     async def _send_command(self, on: bool):
         """Send volume command to device."""
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error("Failed to login for sound command")
-                    return
+                _LOGGER.error("Failed to login for sound command")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
@@ -288,19 +273,16 @@ class TinecoFloorBrushLightSwitch(TinecoBaseSwitch):
         """Send floor brush light command to device."""
         _LOGGER.info(f"🔧 Floor Brush Light: Attempting to turn {'ON' if on else 'OFF'}")
         try:
+            from .client import async_get_or_create_client
             stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
-            if client is None:
+            if stored.get("client") is None:
                 _LOGGER.warning("Floor Brush Light: Client not found, creating new client")
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error("Floor Brush Light: Failed to login")
-                    return
+            client = await async_get_or_create_client(self.hass, self.config_entry)
+            if client is None:
+                _LOGGER.error("Floor Brush Light: Failed to login")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 _LOGGER.warning("Floor Brush Light: Device context not found, fetching devices")
