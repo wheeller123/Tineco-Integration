@@ -13,6 +13,31 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+### Fixed
+- Floor Brush Light switch appearing on models that have no floor brush light,
+  where it reported success and changed nothing (#33, Floor One S5 Combo). The
+  `led` field is absent from these devices' `gci` payload, but the cloud API
+  accepts `{'led': 0}` and answers with a normal success response, so neither
+  the command nor the state read could tell the switch was a no-op.
+  - `switch.async_setup_entry` now checks the coordinator's first `gci` payload
+    and skips `TinecoFloorBrushLightSwitch` when `led` is absent. Only `gci` is
+    consulted — `cfp` omits `led` even on models that do have the light, so its
+    absence there proves nothing.
+  - Absence of a `gci` payload (failed first refresh, timed-out endpoint) counts
+    as *unknown*, not unsupported, so a transient API failure can't drop the
+    switch for a device that does have the light. Such an entity marks itself
+    unavailable and refuses commands as soon as a payload settles the question.
+  - An entity left in the registry by an earlier version is removed on setup, so
+    affected users don't keep a permanently unavailable switch.
+- Added `tests/fixtures/s5_combo_no_led.json` (captured from the #33 debug log)
+  and `tests/test_switch_capabilities.py`. Confirms the Floor One S5 Combo as a
+  working model apart from the brush light.
+
+### Added
+- Floor One S5 Combo listed as a confirmed model. Battery, vacuum status, water
+  tank tracking and all mode/power/suction selects were verified working by the
+  reporter of #33.
+
 ## [v2.4.3] - 2026-07-29
 
 ### Fixed

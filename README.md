@@ -2,7 +2,7 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-Current version: **2.4.3** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro) work with community feedback.
+Current version: **2.4.3** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro / S5 Combo) work with community feedback.
 
 ### Community Lovelace Card
 
@@ -62,7 +62,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
 - **Switch Controls**:
   - Sound: Enabled (mute/unmute)
   - Water Mode: Enabled (enable/disable water-only mode)
-  - Floor Brush Light on/off
+  - Floor Brush Light on/off — *only created on models that have the light*
 - **Select Controls**:
   - Sound: Volume Level (Low, Medium, High)
   - Suction Mode: Power (120W, 150W)
@@ -124,7 +124,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
 ### Switches
 - `switch.tineco_sound_enabled`
 - `switch.tineco_water_mode_enabled`
-- `switch.tineco_floor_brush_light`
+- `switch.tineco_floor_brush_light` — *not created on models with no floor brush
+  light (e.g. Floor One S5 Combo), since those devices ignore the command while
+  the cloud API still reports success*
 
 ### Selects
 - `select.tineco_sound_volume_level` — Low / Medium / High

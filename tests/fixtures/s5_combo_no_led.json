@@ -1,0 +1,54 @@
+{
+  "_source": "Issue #33 debug log (home-assistant_tineco_2026-07-12T20-59-01.454Z.log), Floor One S5 Combo, region IE/FR, integration v2.4.2, HA 2026.7.2.",
+  "_regression_note": "The Floor One S5 Combo has no floor brush light hardware, so its gci payload never contains the 'led' field: ['cds', 'wm', 'scm', 'cnv', 'scs', 'smr', 'sr', 'dv', 'bp', 'bc', 'msr', 'vl', 'vs', 'e', 'cc']. The cloud API nonetheless accepts {'led': 0} and replies with a success payload, so the switch appeared to work while doing nothing (issue #33). The switch platform must not create the Floor Brush Light entity for this payload shape. Note this model also reports errors via a single 'e' field rather than e1/e2/e3, and battery as bp=240 (fully charged).",
+  "devices": [
+    {
+      "did": "00000000-0000-4000-8000-000000000033",
+      "className": "4mssss",
+      "resource": "4HL1",
+      "name": "0000000tb5741d7d0119",
+      "nick": "Floor One S5 Combo",
+      "productType": "Floor One S5 Combo",
+      "productName": "Floor One S5 Combo"
+    }
+  ],
+  "info": {
+    "gci": {
+      "cds": 0,
+      "wm": 2,
+      "scm": 0,
+      "cnv": 0,
+      "scs": 0,
+      "smr": 0,
+      "sr": 2,
+      "dv": 0,
+      "bp": 240,
+      "bc": 2500,
+      "msr": 0,
+      "vl": 4,
+      "vs": 2,
+      "e": 0,
+      "cc": 0
+    },
+    "gav": {
+      "vv": "1.0.0",
+      "tv": "1.0.0"
+    },
+    "cfp": {
+      "cds": 0,
+      "wm": 2,
+      "cnv": 0,
+      "scm": 0,
+      "smr": 0,
+      "bp": 240,
+      "bc": 2500,
+      "sr": 2,
+      "dv": 0,
+      "msr": 0,
+      "vl": 4,
+      "vs": 2,
+      "e": 0,
+      "cc": 0
+    }
+  }
+}
