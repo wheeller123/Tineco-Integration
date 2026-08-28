@@ -17,7 +17,14 @@ target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
-# Ruff defaults (E + F) only. Existing custom_components/tineco code wasn't
-# written against the SIM/B rulesets; enforcing those would mean a
-# code-style PR independent of regression-prevention work.
+# E + F only, stated explicitly rather than left to ruff's defaults. Existing
+# custom_components/tineco code wasn't written against the SIM/B rulesets;
+# enforcing those would mean a code-style PR independent of
+# regression-prevention work.
+#
+# This was implicit until ruff 0.16.0 (2026-07-23) widened its default rule set
+# to ~415 rules (BLE/UP/DTZ/RUF/SIM/B/...), which turned the nightly Validate
+# run red on an unchanged tree with 190 new errors. Keep this select list
+# explicit so a future ruff release can't silently change what CI enforces.
+select = ["E", "F"]
 ignore = ["E501"]  # line length handled by formatter, not lint

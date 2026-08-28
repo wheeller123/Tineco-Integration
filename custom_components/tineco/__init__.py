@@ -30,7 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("No device_id found. Generating new one.")
         device_id = TinecoClient.generate_valid_device_id()
 
-    client = TinecoDeviceClient(email, password, device_id, region)
+    client = TinecoDeviceClient(email, password, device_id, region, hass=hass)
     device_ctx = None
 
     try:

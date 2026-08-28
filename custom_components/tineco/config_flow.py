@@ -48,8 +48,12 @@ class TinecoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         """Initialize the config flow."""
-        temp_client = TinecoClient()
-        self._device_id = temp_client.DEVICE_ID
+        # Must not construct a TinecoClient here: config flows are instantiated
+        # on the event loop and the client's IoT datacenter lookup does blocking
+        # HTTP. Read the class constant instead — this is the same value the old
+        # ``TinecoClient().DEVICE_ID`` produced, and it's part of the login
+        # signature, so it must not change.
+        self._device_id = TinecoClient.DEFAULT_DEVICE_ID
 
         self._tineco_client = None
 
@@ -57,6 +61,16 @@ class TinecoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._password = None
         self._region = "IE"
         self._verify_id = None
+
+    def _build_client_and_login(self):
+        """Create the API client and attempt an interactive login.
+
+        Blocking — runs in an executor thread. The client is assigned before
+        ``login()`` is called so ``async_step_otp`` can reuse it even when
+        login raises ``TinecoNewDeviceException``.
+        """
+        self._tineco_client = TinecoClient(device_id=self._device_id, region=self._region)
+        return self._tineco_client.login(self._email, self._password, True)
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
@@ -67,14 +81,14 @@ class TinecoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._password = user_input["password"]
             self._region = user_input["region"]
 
-            self._tineco_client = TinecoClient(device_id=self._device_id, region=self._region)
-
             await self.async_set_unique_id(self._email)
             self._abort_if_unique_id_configured()
 
             try:
+                # Construct and log in inside the executor — the constructor is
+                # cheap but login() triggers the blocking IoT datacenter lookup.
                 result = await self.hass.async_add_executor_job(
-                    self._tineco_client.login, self._email, self._password, True
+                    self._build_client_and_login
                 )
 
                 if result and result[0]:

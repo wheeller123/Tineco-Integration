@@ -2,48 +2,77 @@
 
 import asyncio
 import logging
-import functools
 from typing import Optional, Dict, List
+from .const import DOMAIN
 from .tineco_client_impl import TinecoClient
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _run_in_executor(func):
-    """Run a sync function in an executor."""
+async def async_get_or_create_client(hass, config_entry) -> Optional["TinecoDeviceClient"]:
+    """Return the stored client for an entry, creating and logging in if absent.
 
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
+    Entity handlers use this as a fallback when ``async_setup_entry`` hasn't
+    stored a client yet. Returns ``None`` if login failed, in which case the
+    caller should abort. Always passes ``hass`` so the blocking API calls run in
+    an executor rather than on the event loop.
+    """
+    stored = hass.data.setdefault(DOMAIN, {}).setdefault(config_entry.entry_id, {})
+    client = stored.get("client")
+    if client is not None:
+        return client
 
-    return wrapper
+    client = TinecoDeviceClient(
+        config_entry.data.get("email"),
+        config_entry.data.get("password"),
+        config_entry.data.get("device_id"),
+        config_entry.data.get("region", "IE"),
+        hass=hass,
+    )
+    stored["client"] = client
+    if not await client.async_login():
+        return None
+    return client
 
 
 class TinecoDeviceClient:
-    """Adapter for Tineco IoT API client."""
+    """Adapter for Tineco IoT API client.
 
-    def __init__(self, email: str, password: str, device_id: str = None, region: str = "IE"):
-        """Initialize Tineco device client."""
+    Every method of the underlying :class:`TinecoClient` performs blocking
+    ``requests`` I/O, so nothing here may run on the event loop. All calls are
+    dispatched via ``hass.async_add_executor_job``.
+    """
+
+    def __init__(self, email: str, password: str, device_id: str = None, region: str = "IE", hass=None):
+        """Initialize Tineco device client.
+
+        ``hass`` is optional only so the standalone scripts in ``scripts/`` can
+        reuse this adapter; inside the integration it is always supplied.
+        """
         self.email = email
         self.password = password
         self.device_id = device_id
         self.region = region
+        self.hass = hass
         self.client = None
         self.devices: List[Dict] = []
         self._initialized = False
         self._device_cache: Dict = {}
 
+    async def _async_run(self, func, *args):
+        """Run a blocking client call in an executor thread."""
+        if self.hass is not None:
+            return await self.hass.async_add_executor_job(func, *args)
+        # No hass (script usage): use the running loop's default executor.
+        return await asyncio.get_running_loop().run_in_executor(None, func, *args)
+
     async def async_login(self) -> bool:
         """Authenticate with Tineco API."""
         try:
-            self.client = TinecoClient(device_id=self.device_id, region=self.region)
-            # Run blocking I/O in executor to avoid blocking event loop
-            loop = asyncio.get_event_loop()
-            success, token, user_id = await loop.run_in_executor(
-                None,
-                lambda: self.client.login(self.email, self.password, request_code=False)
-            )
+            # TinecoClient construction is cheap, but its IoT datacenter lookup
+            # is not — both the constructor and login() run in the executor so
+            # no HTTP call can ever touch the event loop.
+            self.client, success, token, user_id = await self._async_run(self._login)
 
             if success:
                 _LOGGER.info(f"Successfully logged into Tineco API ({self.region}). UID: {user_id}")
@@ -56,12 +85,17 @@ class TinecoDeviceClient:
             _LOGGER.error(f"Error during login: {err}", exc_info=True)
             return False
 
+    def _login(self):
+        """Construct the client and log in. Blocking — executor only."""
+        client = self.client or TinecoClient(device_id=self.device_id, region=self.region)
+        success, token, user_id = client.login(self.email, self.password, request_code=False)
+        return client, success, token, user_id
+
     async def async_get_devices(self) -> Optional[List[Dict]]:
         if not self._initialized or not self.client:
             return None
         try:
-            loop = asyncio.get_event_loop()
-            devices_response = await loop.run_in_executor(None, self.client.get_devices)
+            devices_response = await self._async_run(self.client.get_devices)
             if devices_response:
                 self.devices = self.client.device_list
                 return self.devices
@@ -74,8 +108,9 @@ class TinecoDeviceClient:
         if not self._initialized or not self.client:
             return None
         try:
-            loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(None, lambda: self.client.get_complete_device_info(device_id, device_class, device_resource))
+            info = await self._async_run(
+                self.client.get_complete_device_info, device_id, device_class, device_resource
+            )
             return info if info else None
         except Exception as err:
             _LOGGER.error(f"Error getting device info: {err}")
@@ -89,10 +124,8 @@ class TinecoDeviceClient:
             return None
 
         try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None,
-                lambda: self.client.get_controller_info(device_id, device_class, device_resource)
+            return await self._async_run(
+                self.client.get_controller_info, device_id, device_class, device_resource
             )
         except Exception as err:
             _LOGGER.error(f"Error getting controller info: {err}")
@@ -106,10 +139,8 @@ class TinecoDeviceClient:
             return None
 
         try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None,
-                lambda: self.client.get_api_version(device_id, device_class, device_resource)
+            return await self._async_run(
+                self.client.get_api_version, device_id, device_class, device_resource
             )
         except Exception as err:
             _LOGGER.error(f"Error getting API version: {err}")
@@ -123,10 +154,8 @@ class TinecoDeviceClient:
             return None
 
         try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None,
-                lambda: self.client.get_config_file(device_id, device_class, device_resource)
+            return await self._async_run(
+                self.client.get_config_file, device_id, device_class, device_resource
             )
         except Exception as err:
             _LOGGER.error(f"Error getting config file: {err}")
@@ -140,10 +169,8 @@ class TinecoDeviceClient:
             return None
 
         try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None,
-                lambda: self.client.query_device_mode(device_id, device_class, device_resource)
+            return await self._async_run(
+                self.client.query_device_mode, device_id, device_class, device_resource
             )
         except Exception as err:
             _LOGGER.error(f"Error querying device mode: {err}")
@@ -155,7 +182,7 @@ class TinecoDeviceClient:
                                    device_class: str = "",
                                    action: str = "cfp") -> Optional[Dict]:
         """Send control command to device.
-        
+
         Args:
             device_id: Device ID
             command: Command payload
@@ -167,10 +194,10 @@ class TinecoDeviceClient:
             return None
 
         try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
-                None,
-                lambda: self.client.control_device(device_id, command, device_sn, device_class, action=action)
+            return await self._async_run(
+                lambda: self.client.control_device(
+                    device_id, command, device_sn, device_class, action=action
+                )
             )
         except Exception as err:
             _LOGGER.error(f"Error sending device command: {err}")

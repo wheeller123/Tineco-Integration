@@ -43,7 +43,7 @@ async def test_invalid_credentials_show_invalid_auth_error(hass: HomeAssistant):
     ) as mock_client_cls:
         mock_client = mock_client_cls.return_value
         mock_client.login.return_value = (False, None, None)
-        mock_client.DEVICE_ID = "test_device_id"
+        mock_client_cls.DEFAULT_DEVICE_ID = "test_device_id"
 
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
@@ -73,7 +73,7 @@ async def test_successful_login_creates_entry(hass: HomeAssistant):
     ) as mock_client_cls:
         mock_client = mock_client_cls.return_value
         mock_client.login.return_value = (True, "access-token", "uid-1234")
-        mock_client.DEVICE_ID = "device-abc"
+        mock_client_cls.DEFAULT_DEVICE_ID = "device-abc"
 
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}
@@ -103,7 +103,7 @@ async def test_new_device_routes_to_otp_step(hass: HomeAssistant):
     ) as mock_client_cls:
         mock_client = mock_client_cls.return_value
         mock_client.login.side_effect = TinecoNewDeviceException(verify_id="verify-xyz")
-        mock_client.DEVICE_ID = "device-abc"
+        mock_client_cls.DEFAULT_DEVICE_ID = "device-abc"
 
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": "user"}

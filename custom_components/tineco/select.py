@@ -133,20 +133,15 @@ def update_mode_state_from_coordinator(hass: HomeAssistant, config_entry: Config
 async def send_mode_commands(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Send all 4 mode commands in sequence when any interdependent control changes."""
     try:
-        stored = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
         mode_state = get_mode_state(hass, config_entry)
 
-        client = stored.get("client")
+        from .client import async_get_or_create_client
+        client = await async_get_or_create_client(hass, config_entry)
         if client is None:
-            from .client import TinecoDeviceClient
-            email = config_entry.data.get("email")
-            password = config_entry.data.get("password")
-            client = TinecoDeviceClient(email, password)
-            hass.data[DOMAIN][config_entry.entry_id]["client"] = client
-            if not await client.async_login():
-                _LOGGER.error("Failed to login for mode commands")
-                return False
+            _LOGGER.error("Failed to login for mode commands")
+            return False
 
+        stored = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
         device_ctx = stored.get("device")
         if not device_ctx:
             devices = await client.async_get_devices()
@@ -287,18 +282,13 @@ class TinecoVolumeSelect(SelectEntity):
         _LOGGER.info(f"Setting volume level to {option} (vl={volume_value})")
         
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error("Failed to login for volume level command")
-                    return
+                _LOGGER.error("Failed to login for volume level command")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
@@ -416,18 +406,13 @@ class TinecoBaseSelect(SelectEntity):
         _LOGGER.info(f"Setting {self.select_type} to {option} ({self.command_key}={value})")
 
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error(f"Failed to login for {self.select_type} command")
-                    return
+                _LOGGER.error(f"Failed to login for {self.select_type} command")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
