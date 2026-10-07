@@ -19,5 +19,9 @@ line-length = 120
 [tool.ruff.lint]
 # Ruff defaults (E + F) only. Existing custom_components/tineco code wasn't
 # written against the SIM/B rulesets; enforcing those would mean a
-# code-style PR independent of regression-prevention work.
+# code-style PR independent of regression-prevention work. ``select`` is
+# pinned explicitly so the CI lint job stays deterministic across ruff
+# releases (newer ruff versions expand the implicit default select, which
+# would otherwise fail CI on pre-existing style nits unrelated to any change).
+select = ["E4", "E7", "E9", "F"]
 ignore = ["E501"]  # line length handled by formatter, not lint
