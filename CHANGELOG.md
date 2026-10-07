@@ -13,6 +13,13 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+### Fixed
+- Hassfest `[REQUIREMENTS]` validation failure: removed `requests>=2.28.0`
+  from `custom_components/tineco/manifest.json`. `requests` is a dependency of
+  Home Assistant core, so hassfest forbids custom integrations from listing it
+  in their manifest. The library is still provided by HA at runtime, so there
+  is no behavior change.
+
 ### Added
 - Release guardrails encoding lessons from past releases:
   - `scripts/check_release_consistency.py` verifies manifest version is valid
