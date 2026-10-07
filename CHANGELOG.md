@@ -14,6 +14,18 @@ Two rules for contributors:
 ## [Unreleased]
 
 ### Fixed
+- Issue #35: sensors no longer go **unavailable** the moment the device drops
+  offline. Because every entity subclassed `CoordinatorEntity` with no custom
+  `available`, a failed coordinator refresh (e.g. the S11 handheld only reports
+  online while its trigger is held) immediately blanked every sensor. The
+  battery sensor plus the firmware, API, model, vacuum status, waste-water
+  tank, fresh-water tank and brush-roller sensors now **retain** their last
+  reported value across offline periods (battery is the primary target — an
+  empty refresh keeps the last reading instead of resetting to `None`) and
+  **restore** it on restart via `RestoreSensor` (battery) / `RestoreEntity`
+  (the enum/text sensors). The `online` and `charging` binary sensors
+  deliberately do **not** retain: `online` *is* the availability signal, and a
+  retained "charging while offline" would misreport the live state.
 - Hassfest `[REQUIREMENTS]` validation failure: removed `requests>=2.28.0`
   from `custom_components/tineco/manifest.json`. `requests` is a dependency of
   Home Assistant core, so hassfest forbids custom integrations from listing it
