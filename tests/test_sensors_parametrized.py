@@ -65,3 +65,22 @@ def test_sensor_produces_usable_state(fixture_name, fixture_data, sensor_cls):
         f"source field for this sensor, or the sensor's _update_state_from_data "
         f"regressed."
     )
+
+
+# ---------------------------------------------------------------------------
+# Per-model assertions (release checklist: "When a new device model gets
+# reported in issues" → add a one-line assertion for the new fixture).
+# ---------------------------------------------------------------------------
+
+def test_s5_combo_model_and_battery(load_fixture):
+    """Floor One S5 Combo (#33) — model comes from productType, and the
+    bp=240 fully-charged sentinel clamps to 100%."""
+    fx = load_fixture("s5_combo_no_led")
+
+    model = make_sensor(TinecoModelSensor, devices=fx["devices"])
+    model._update_state_from_data(fx["info"])
+    battery = make_sensor(TinecoBatterySensor, devices=fx["devices"])
+    battery._update_state_from_data(fx["info"])
+
+    assert model._state == "Floor One S5 Combo"
+    assert battery._state == 100

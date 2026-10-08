@@ -6,6 +6,7 @@ import logging
 import requests
 from requests.exceptions import SSLError, Timeout
 import hashlib
+import threading
 import time
 import uuid
 from typing import Dict, Optional, Tuple
@@ -25,6 +26,10 @@ class TinecoClient:
 
     AUTH_APPKEY = "1538105560006"
     APP_SECRET = "fb7045ebb8ae5297bca45cbf5a5597ab"
+
+    # Fallback device ID used when the caller doesn't supply one. Part of the
+    # login signature, so changing it re-triggers new-device verification.
+    DEFAULT_DEVICE_ID = "57938f751acc6897088c718770edcd00"
 
     # IoT / AuthCode constants
     AUTH_APPKEY_AUTHCODE = "1538103661113"
@@ -66,7 +71,7 @@ class TinecoClient:
         if device_id:
             self.DEVICE_ID = device_id
         else:
-            self.DEVICE_ID = "57938f751acc6897088c718770edcd00"
+            self.DEVICE_ID = self.DEFAULT_DEVICE_ID
 
         self.APP_VERSION = "1.7.0"
         self.STORE = "google_play"
@@ -93,18 +98,50 @@ class TinecoClient:
             "User-Agent": "okhttp/3.12.0",
             "Connection": "Keep-Alive"
         })
-        dc = self._resolve_iot_datacenter()
-        vendor = "cn" if self._is_china_region() else "ww"
-        self.IOT_API_BASE = f"https://api-ngiot.dc-{dc}.{vendor}.ecouser.net/api/iot/endpoint/control"
-        self.IOT_LOGIN_ENDPOINT = f"https://api-base.dc-{dc}.{vendor}.ecouser.net/api/users/user.do"
+
+        # The IoT datacenter is resolved with a blocking HTTP call, so it must
+        # NOT happen here: constructing the client is done on Home Assistant's
+        # event loop and HA flags any socket I/O there as a blocking call. The
+        # lookup is deferred to the first use of an IoT endpoint, which only
+        # ever happens from inside an executor thread.
+        self._dc: Optional[str] = None
+        self._dc_lock = threading.Lock()
+        self.IOT_VENDOR = "cn" if self._is_china_region() else "ww"
         _LOGGER.debug(
-            "Tineco: client init — region=%s, dc=%s, vendor=%s, rest_host=%s, iot_login=%s",
-            self.region, dc, vendor, self.REST_API_HOST, self.IOT_LOGIN_ENDPOINT,
+            "Tineco: client init — region=%s, vendor=%s, rest_host=%s (IoT datacenter resolved lazily)",
+            self.region, self.IOT_VENDOR, self.REST_API_HOST,
         )
 
     def _is_china_region(self) -> bool:
         """Return True if the configured region is mainland China."""
         return self.region.upper() == "CN"
+
+    @property
+    def dc(self) -> str:
+        """IoT datacenter code, resolved on first access and cached.
+
+        Blocking: performs an HTTP lookup the first time it is read. Only read
+        it from a thread, never from the event loop.
+        """
+        if self._dc is None:
+            with self._dc_lock:
+                if self._dc is None:
+                    self._dc = self._resolve_iot_datacenter()
+                    _LOGGER.debug(
+                        "Tineco: IoT endpoints resolved — region=%s, dc=%s, vendor=%s",
+                        self.region, self._dc, self.IOT_VENDOR,
+                    )
+        return self._dc
+
+    @property
+    def IOT_API_BASE(self) -> str:
+        """IoT control endpoint. Blocking on first access (see ``dc``)."""
+        return f"https://api-ngiot.dc-{self.dc}.{self.IOT_VENDOR}.ecouser.net/api/iot/endpoint/control"
+
+    @property
+    def IOT_LOGIN_ENDPOINT(self) -> str:
+        """IoT login endpoint. Blocking on first access (see ``dc``)."""
+        return f"https://api-base.dc-{self.dc}.{self.IOT_VENDOR}.ecouser.net/api/users/user.do"
 
     # Static region-to-datacenter fallback map (used when API lookup fails)
     REGION_DC_MAP = {
@@ -181,8 +218,15 @@ class TinecoClient:
         Login method.
         request_code=True -> Sends email if 10001 error occurs (Interactive mode).
         request_code=False -> Just logs error (Background mode).
+
+        Blocking — must be called from an executor thread, never the event loop.
         """
         try:
+            # Warm the datacenter cache while we are already off the event loop,
+            # so later reads of IOT_API_BASE / IOT_LOGIN_ENDPOINT are pure
+            # string formatting and can't block whoever touches them.
+            _ = self.dc
+
             timestamp = int(time.time() * 1000)
             password_md5 = self._md5_hash(password)
 

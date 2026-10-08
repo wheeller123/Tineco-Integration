@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from typing import Dict, Optional
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
@@ -11,6 +12,41 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "tineco"
 
+# Field the floor brush light reads and writes. Not every model has the LED
+# hardware — the Floor One S5 Combo has no floor brush light at all and never
+# reports the field, yet the cloud API still answers a ``{'led': N}`` command
+# with a success response. A switch created for such a device looks functional
+# but silently does nothing, so we detect the capability instead. (#33)
+LED_FIELD = "led"
+
+
+def _gci_payload(info) -> Optional[Dict]:
+    """Return the ``gci`` payload from coordinator data, or ``None``.
+
+    Only ``gci`` is consulted for capability detection: ``cfp`` omits ``led``
+    even on models that *do* have the light (true of every captured fixture),
+    so its absence there proves nothing.
+    """
+    if isinstance(info, dict):
+        gci = info.get("gci")
+        if isinstance(gci, dict):
+            return gci
+    return None
+
+
+def led_supported(info) -> Optional[bool]:
+    """Whether this device reports the floor brush light field.
+
+    Returns ``True``/``False`` once a ``gci`` payload settles it, and ``None``
+    while there is no ``gci`` to judge by (first refresh failed, endpoint timed
+    out, ...). Callers must treat unknown as supported so a transient API
+    failure can never drop the entity for a device that does have the light.
+    """
+    payload = _gci_payload(info)
+    if payload is None:
+        return None
+    return LED_FIELD in payload
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -19,14 +55,52 @@ async def async_setup_entry(
 ) -> None:
     """Set up switch platform from a config entry."""
 
-    # Add all switches
+    stored = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {})
+    coordinator = stored.get("coordinator")
+    info = coordinator.data if coordinator is not None else None
+
     switches = [
         TinecoAudioSwitch(config_entry, hass),
-        TinecoFloorBrushLightSwitch(config_entry, hass),
-        TinecoWaterOnlyModeSwitch(config_entry, hass),
     ]
 
+    # Skip the floor brush light on models that don't have one (#33) rather
+    # than exposing a switch that reports success and changes nothing.
+    if led_supported(info) is False:
+        _LOGGER.info(
+            "Tineco: device does not report the '%s' field — skipping the Floor "
+            "Brush Light switch (this model has no floor brush light). "
+            "Available gci fields: %s",
+            LED_FIELD, sorted(_gci_payload(info) or ()),
+        )
+        _async_remove_stale_brush_light(hass, config_entry)
+    else:
+        switches.append(TinecoFloorBrushLightSwitch(config_entry, hass))
+
+    switches.append(TinecoWaterOnlyModeSwitch(config_entry, hass))
+
     async_add_entities(switches)
+
+
+def _async_remove_stale_brush_light(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    """Delete a Floor Brush Light entity left behind by an earlier version.
+
+    Users who ran a build that created the switch unconditionally would
+    otherwise keep a restored-but-never-updated entity forever, since HA only
+    prunes registry entries for platforms that stop being set up entirely.
+    """
+    try:
+        from homeassistant.helpers import entity_registry as er
+
+        registry = er.async_get(hass)
+        email = config_entry.data.get("email", "")
+        entity_id = registry.async_get_entity_id(
+            "switch", DOMAIN, f"{DOMAIN}_{email}_floor_brush_light"
+        )
+        if entity_id:
+            _LOGGER.info("Tineco: removing stale Floor Brush Light entity %s", entity_id)
+            registry.async_remove(entity_id)
+    except Exception as err:  # never block setup over registry cleanup
+        _LOGGER.debug("Tineco: could not remove stale Floor Brush Light entity: %s", err)
 
 
 class TinecoBaseSwitch(SwitchEntity):
@@ -63,6 +137,8 @@ class TinecoBaseSwitch(SwitchEntity):
     async def async_turn_on(self, **kwargs):
         """Turn the switch on."""
         _LOGGER.info(f"Turning on {self.switch_type}")
+        if not await self._async_can_send():
+            return
         # Send control command to device
         await self._send_command(on=True)
         self._state = True
@@ -72,11 +148,21 @@ class TinecoBaseSwitch(SwitchEntity):
     async def async_turn_off(self, **kwargs):
         """Turn the switch off."""
         _LOGGER.info(f"Turning off {self.switch_type}")
+        if not await self._async_can_send():
+            return
         # Send control command to device
         await self._send_command(on=False)
         self._state = False
         self._last_command_time = datetime.now()
         self.async_write_ha_state()
+
+    async def _async_can_send(self) -> bool:
+        """Veto a command before it is sent - override in subclasses.
+
+        Returning False also suppresses the optimistic state write, so a
+        control the device can't honour doesn't report a state it isn't in.
+        """
+        return True
 
     async def _send_command(self, on: bool):
         """Send command to device - override in subclasses."""
@@ -85,18 +171,13 @@ class TinecoBaseSwitch(SwitchEntity):
     async def async_update(self):
         """Update switch state."""
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.debug("Failed to login during update")
-                    return
+                _LOGGER.debug("Failed to login during update")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
@@ -135,18 +216,13 @@ class TinecoDevicePowerSwitch(TinecoBaseSwitch):
     async def _send_command(self, on: bool):
         """Send power command to device."""
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error("Failed to login for power command")
-                    return
+                _LOGGER.error("Failed to login for power command")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
@@ -194,18 +270,13 @@ class TinecoAudioSwitch(TinecoBaseSwitch):
     async def _send_command(self, on: bool):
         """Send volume command to device."""
         try:
-            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
+            from .client import async_get_or_create_client
+            client = await async_get_or_create_client(self.hass, self.config_entry)
             if client is None:
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error("Failed to login for sound command")
-                    return
+                _LOGGER.error("Failed to login for sound command")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 devices = await client.async_get_devices()
@@ -283,24 +354,58 @@ class TinecoFloorBrushLightSwitch(TinecoBaseSwitch):
         """Initialize the floor brush light switch."""
         super().__init__(config_entry, "floor_brush_light", hass)
         self._state = False  # Assume light is off by default
+        # None = not yet determined (no gci payload seen). Only ever set False
+        # once a gci payload has actually proved the field absent.
+        self._supported = None
+
+    def _refresh_supported(self) -> Optional[bool]:
+        """Re-evaluate LED support from the latest coordinator data."""
+        stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
+        coordinator = stored.get("coordinator")
+        supported = led_supported(coordinator.data if coordinator is not None else None)
+        if supported is not None:
+            self._supported = supported
+        return self._supported
+
+    @property
+    def available(self) -> bool:
+        """Return False for devices with no floor brush light hardware.
+
+        ``async_setup_entry`` normally skips this entity entirely, but it can
+        only do that when the first refresh already returned a ``gci`` payload.
+        For an entry set up while the API was failing, the entity exists and
+        goes unavailable as soon as a payload proves the field absent — better
+        than a switch that reports success and does nothing. (#33)
+        """
+        return self._supported is not False
+
+    async def _async_can_send(self) -> bool:
+        """Refuse the command on devices with no floor brush light. (#33)"""
+        if self._refresh_supported() is False:
+            _LOGGER.warning(
+                "Floor Brush Light: this device does not report the '%s' field, so it "
+                "has no floor brush light to control — ignoring the command. The "
+                "Tineco API accepts the command and replies success regardless, "
+                "which is why it used to look like it worked.",
+                LED_FIELD,
+            )
+            return False
+        return True
 
     async def _send_command(self, on: bool):
         """Send floor brush light command to device."""
         _LOGGER.info(f"🔧 Floor Brush Light: Attempting to turn {'ON' if on else 'OFF'}")
         try:
+            from .client import async_get_or_create_client
             stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
-            client = stored.get("client")
-            if client is None:
+            if stored.get("client") is None:
                 _LOGGER.warning("Floor Brush Light: Client not found, creating new client")
-                from .client import TinecoDeviceClient
-                email = self.config_entry.data.get("email")
-                password = self.config_entry.data.get("password")
-                client = TinecoDeviceClient(email, password)
-                self.hass.data[DOMAIN][self.config_entry.entry_id]["client"] = client
-                if not await client.async_login():
-                    _LOGGER.error("Floor Brush Light: Failed to login")
-                    return
+            client = await async_get_or_create_client(self.hass, self.config_entry)
+            if client is None:
+                _LOGGER.error("Floor Brush Light: Failed to login")
+                return
 
+            stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             device_ctx = stored.get("device")
             if not device_ctx:
                 _LOGGER.warning("Floor Brush Light: Device context not found, fetching devices")
@@ -323,7 +428,7 @@ class TinecoFloorBrushLightSwitch(TinecoBaseSwitch):
             _LOGGER.info(f"Floor Brush Light: Device context - ID: {device_id}, SN: {device_sn}, Class: {device_class}")
 
             # Send floor brush light command: led = 0 for on, led = 1 for off (inverted)
-            command = {"led": 0 if on else 1}
+            command = {LED_FIELD: 0 if on else 1}
             _LOGGER.info(f"Floor Brush Light: Sending command {command} to device {device_id}")
 
             result = await client.async_control_device(device_id, command, device_sn, device_class)
@@ -346,10 +451,10 @@ class TinecoFloorBrushLightSwitch(TinecoBaseSwitch):
 
                     for endpoint in ['gci', 'cfp']:
                         if endpoint in info and isinstance(info[endpoint], dict):
-                            if 'led' in info[endpoint]:
-                                _LOGGER.info(f"Floor Brush Light: Found 'led' field in {endpoint}: {info[endpoint]['led']}")
+                            if LED_FIELD in info[endpoint]:
+                                _LOGGER.info(f"Floor Brush Light: Found '{LED_FIELD}' field in {endpoint}: {info[endpoint][LED_FIELD]}")
                             else:
-                                _LOGGER.warning(f"Floor Brush Light: 'led' field NOT found in {endpoint}")
+                                _LOGGER.warning(f"Floor Brush Light: '{LED_FIELD}' field NOT found in {endpoint}")
                                 _LOGGER.debug(f"Floor Brush Light: Available fields in {endpoint}: {list(info[endpoint].keys())}")
 
         except Exception as err:
@@ -373,30 +478,30 @@ class TinecoFloorBrushLightSwitch(TinecoBaseSwitch):
                 info = coordinator.data
                 _LOGGER.debug("Floor Brush Light: Updating state from coordinator data")
 
-                # Check gci or cfp for led (floor brush light) field
-                payload = None
-                payload_source = None
-                if isinstance(info, dict):
-                    if 'gci' in info and isinstance(info['gci'], dict):
-                        payload = info['gci']
-                        payload_source = "gci"
-                    elif 'cfp' in info and isinstance(info['cfp'], dict):
-                        payload = info['cfp']
-                        payload_source = "cfp"
+                payload = _gci_payload(info)
 
-                if payload:
-                    if 'led' in payload:
+                if payload is not None:
+                    was_supported = self._supported
+                    self._supported = LED_FIELD in payload
+
+                    if self._supported:
                         # led = 0 means light on, led = 1 means light off (inverted)
                         old_state = self._state
-                        self._state = payload['led'] == 0
-                        _LOGGER.debug(f"Floor Brush Light: State from {payload_source}.led: {payload['led']} → {'ON' if self._state else 'OFF'}")
+                        self._state = payload[LED_FIELD] == 0
+                        _LOGGER.debug(f"Floor Brush Light: State from gci.led: {payload[LED_FIELD]} → {'ON' if self._state else 'OFF'}")
                         if old_state != self._state:
                             _LOGGER.info(f"Floor Brush Light: State changed from {'ON' if old_state else 'OFF'} to {'ON' if self._state else 'OFF'}")
-                    else:
-                        _LOGGER.debug(f"Floor Brush Light: 'led' field not found in {payload_source}")
-                        _LOGGER.debug(f"Floor Brush Light: Available fields in {payload_source}: {list(payload.keys())[:20]}")
+                    elif was_supported is not False:
+                        # First payload proving this model has no LED — say so once
+                        # at INFO, then go unavailable rather than pretending. (#33)
+                        _LOGGER.info(
+                            "Floor Brush Light: device does not report the '%s' field, so it "
+                            "has no floor brush light — marking the switch unavailable. "
+                            "Available gci fields: %s",
+                            LED_FIELD, list(payload.keys())[:20],
+                        )
                 else:
-                    _LOGGER.debug("Floor Brush Light: No valid payload found in coordinator data")
+                    _LOGGER.debug("Floor Brush Light: No gci payload found in coordinator data")
             else:
                 _LOGGER.debug("Floor Brush Light: No coordinator data available")
 

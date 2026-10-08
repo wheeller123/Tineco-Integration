@@ -12,7 +12,9 @@ matches expectations.
 Checks performed:
 
 * Every ``sensor.tineco_*``, ``switch.tineco_*``, ``select.tineco_*``,
-  ``binary_sensor.tineco_*`` entity must exist.
+  ``binary_sensor.tineco_*`` entity must exist — except the
+  capability-dependent ones in ``OPTIONAL_ENTITY_IDS``, which are only created
+  when the device reports the backing field and are merely reported here.
 * No entity may be ``unknown`` / ``unavailable``.
 * The model sensor (``sensor.tineco_model``) must not look like an internal
   project code (e.g. ``Floor One-1580``) — that's the v2.2.10→v2.2.12
@@ -84,12 +86,22 @@ REQUIRED_ENTITY_PREFIXES = {
     "switch.tineco_": [
         # Suffix matched against the entity_id; HA slugifies "Sound" → "tineco_sound" etc.
         "sound",
-        "floor_brush_light",
     ],
     "binary_sensor.tineco_": [
         "online",
         "charging",
     ],
+}
+
+# Entities the integration only creates when the device reports the backing
+# field. Their absence is a valid outcome, not a failure — the Floor One S5
+# Combo has no floor brush light hardware and never reports ``led`` (#33), so
+# requiring the switch would fail the smoke run on a correctly-working device.
+OPTIONAL_ENTITY_IDS = {
+    "switch.tineco_floor_brush_light": (
+        "only created on models that report the 'led' field — absent on e.g. "
+        "Floor One S5 Combo, which has no floor brush light (#33)"
+    ),
 }
 
 VACUUM_STATUS_OPTIONS = {"idle", "in_operation", "self_cleaning"}
@@ -138,6 +150,14 @@ def run(base_url: str, token: str) -> int:
             ok = entity_id in tineco_states
             if not report(f"{entity_id} present", ok):
                 failures += 1
+
+    # ---- Capability-dependent entities: report, never fail ----
+    print("\nCapability-dependent entities:")
+    for entity_id, why in sorted(OPTIONAL_ENTITY_IDS.items()):
+        if entity_id in tineco_states:
+            report(f"{entity_id} present", True)
+        else:
+            print(_c(f"  - {entity_id} absent — expected when {why}", DIM))
 
     # ---- No entity is unknown/unavailable ----
     print("\nEntity states:")
