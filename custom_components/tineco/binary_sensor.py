@@ -64,6 +64,16 @@ class TinecoBaseBinarySensor(CoordinatorEntity, BinarySensorEntity):
     rather than issuing their own IoT queries. This keeps the upstream API load
     to a single request per refresh cycle and means a single flaky endpoint can
     no longer cause one entity to take >10s and report a wrong state.
+
+    Issue #35 note — these binary sensors deliberately do NOT retain/restore
+    (unlike the retaining sensors in sensor.py):
+    - ``online`` IS the availability signal itself; it must track the live
+      coordinator (``last_update_success``). Retaining a stale "online" would
+      hide the very offline condition it exists to report.
+    - ``charging`` is a transient/live state; a retained "charging while
+      offline" would mislead users about the current charge state.
+    Both therefore keep reflecting the live coordinator with no custom
+    ``available`` override.
     """
 
     def __init__(self, config_entry: ConfigEntry, sensor_type: str, hass: HomeAssistant, coordinator):

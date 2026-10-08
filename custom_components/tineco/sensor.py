@@ -3,10 +3,11 @@
 import logging
 import re
 from typing import Dict, Optional
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, RestoreSensor
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -101,7 +102,86 @@ class TinecoBaseSensor(CoordinatorEntity, SensorEntity):
         pass
 
 
-class TinecoFirmwareVersionSensor(TinecoBaseSensor):
+class TinecoRetainingSensor(TinecoBaseSensor):
+    """Base for sensors that RETAIN their last reported value when offline.
+
+    Issue #35: the Tineco S11 handheld only reports "online" while its trigger
+    is held, so the coordinator refresh fails (``UpdateFailed`` ->
+    ``last_update_success`` False) almost immediately. Because every entity
+    subclasses ``CoordinatorEntity`` with no ``available`` override, the
+    default ``available`` is ``coordinator.last_update_success`` and the
+    sensors flip to *unavailable* the moment the device stops reporting.
+
+    These sensors expose device *facts* (battery level, firmware/API/model,
+    tank/brush state) whose last known value stays meaningful across a brief
+    offline window. So this base:
+
+    (a) overrides ``available`` to stay True once a real value has been seen
+        (``_has_value``), decoupling availability from the coordinator's
+        last-refresh outcome;
+    (b) only overwrites ``_state`` on a refresh that actually produced data,
+        otherwise keeps the previously cached value;
+    (c) restores the last value on HA restart in ``async_added_to_hass``
+        (subclasses implement ``_restore_last_value`` using RestoreSensor /
+        RestoreEntity).
+
+    Contrast: ``binary_sensor.py`` (online/charging) deliberately does NOT
+    retain — see the note there.
+    """
+
+    def __init__(self, config_entry: ConfigEntry, sensor_type: str, hass: HomeAssistant, coordinator):
+        """Initialize the retaining sensor."""
+        super().__init__(config_entry, sensor_type, hass, coordinator)
+        # True once this entity has ever held a real, known value (from a
+        # live refresh or a restored state). Drives the availability override.
+        self._has_value = False
+
+    @property
+    def available(self) -> bool:
+        """Stay available once a value is known, regardless of the last refresh.
+
+        Issue #35 fix: a failed coordinator refresh (device offline) must not
+        blank a sensor that already has a cached/restored value. Before the
+        very first known value we fall back to the coordinator's availability.
+        """
+        if self._has_value:
+            return True
+        return super().available
+
+    def _handle_coordinator_update(self):
+        """Handle updated data from the coordinator, keeping the last value.
+
+        Only overwrite ``_state`` when the coordinator produced usable data;
+        on an empty/failed refresh we keep the previously cached value so the
+        sensor does not blank out while the device is briefly offline.
+        """
+        if self.coordinator.data:
+            self._update_state_from_data(self.coordinator.data)
+        self.async_write_ha_state()
+
+    def _update_state_from_data(self, info: Dict):
+        """Update state and mark that a value is now known.
+
+        Subclasses override ``_apply_state_from_data`` with the actual parsing
+        so the ``_has_value`` bookkeeping lives in one place.
+        """
+        self._apply_state_from_data(info)
+        if self._state is not None:
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
+        """Parse ``info`` into ``self._state`` - override in subclasses."""
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last value when the entity is (re)added to HA."""
+        await super().async_added_to_hass()
+        await self._restore_last_value()
+
+    async def _restore_last_value(self) -> None:
+        """Restore the last persisted value - override in subclasses."""
+
+
+class TinecoFirmwareVersionSensor(TinecoRetainingSensor, RestoreEntity):
     """Sensor for firmware version."""
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
@@ -109,7 +189,18 @@ class TinecoFirmwareVersionSensor(TinecoBaseSensor):
         super().__init__(config_entry, "firmware_version", hass, coordinator)
         self._state = "Unknown"
 
-    def _update_state_from_data(self, info: Dict):
+    async def _restore_last_value(self) -> None:
+        """Restore the last firmware string across a restart (RestoreEntity).
+
+        Retains because firmware version is a slow-changing device fact; a
+        brief offline window should not blank it.
+        """
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state not in (None, "unknown", "unavailable"):
+            self._state = last_state.state
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
         """Update state from device info."""
         # Try to find firmware version from endpoints
         try:
@@ -155,7 +246,7 @@ class TinecoFirmwareVersionSensor(TinecoBaseSensor):
         return "mdi:information"
 
 
-class TinecoAPISensor(TinecoBaseSensor):
+class TinecoAPISensor(TinecoRetainingSensor, RestoreEntity):
     """Sensor for API version."""
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
@@ -163,7 +254,18 @@ class TinecoAPISensor(TinecoBaseSensor):
         super().__init__(config_entry, "api_version", hass, coordinator)
         self._state = "Unknown"
 
-    def _update_state_from_data(self, info: Dict):
+    async def _restore_last_value(self) -> None:
+        """Restore the last API version across a restart (RestoreEntity).
+
+        Retains because the API version is a static device fact that should
+        survive a brief offline window rather than go unavailable.
+        """
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state not in (None, "unknown", "unavailable"):
+            self._state = last_state.state
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
         """Update state from device info."""
         # Try to find API version in any endpoint
         try:
@@ -204,7 +306,7 @@ class TinecoAPISensor(TinecoBaseSensor):
         return "mdi:api"
 
 
-class TinecoModelSensor(TinecoBaseSensor):
+class TinecoModelSensor(TinecoRetainingSensor, RestoreEntity):
     """Sensor for device model."""
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
@@ -212,7 +314,20 @@ class TinecoModelSensor(TinecoBaseSensor):
         super().__init__(config_entry, "model", hass, coordinator)
         self._state = "Unknown"
 
-    def _update_state_from_data(self, info: Dict):
+    async def _restore_last_value(self) -> None:
+        """Restore the last model label across a restart (RestoreEntity).
+
+        Retains because the model is a static device fact; a brief offline
+        window should not blank the identity of the device.
+        """
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state not in (
+            None, "unknown", "unavailable", "Tineco Device"
+        ):
+            self._state = last_state.state
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
         """Update state from device info."""
         # Try to find model in device list first (most reliable)
         try:
@@ -289,7 +404,7 @@ class TinecoModelSensor(TinecoBaseSensor):
         return "mdi:home"
 
 
-class TinecoVacuumStatusSensor(TinecoBaseSensor):
+class TinecoVacuumStatusSensor(TinecoRetainingSensor, RestoreEntity):
     """Sensor for vacuum operating status."""
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
@@ -300,7 +415,18 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
         self._attr_options = ["idle", "in_operation", "self_cleaning"]
         self._attr_translation_key = "vacuum_status"
 
-    def _update_state_from_data(self, info: Dict):
+    async def _restore_last_value(self) -> None:
+        """Restore the last vacuum status across a restart (RestoreEntity).
+
+        Retains the last reported status so a brief offline window shows the
+        last known state rather than going unavailable.
+        """
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in self._attr_options:
+            self._state = last_state.state
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
         """Update state from device info.
 
         Based on FloorSyscBean from decompiled Tineco app (CL2349 / Floor One Switch S7):
@@ -406,8 +532,14 @@ class TinecoVacuumStatusSensor(TinecoBaseSensor):
             return "mdi:home-circle"
 
 
-class TinecoBatterySensor(TinecoBaseSensor):
-    """Sensor for battery percentage."""
+class TinecoBatterySensor(TinecoRetainingSensor, RestoreSensor):
+    """Sensor for battery percentage.
+
+    Primary target of issue #35. Battery level is the fact users most want to
+    keep seeing when the handheld goes offline between uses, so it both RETAINS
+    its last value across empty refreshes (never resets a known value to None)
+    and RESTORES it on HA restart via RestoreSensor.
+    """
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
         """Initialize."""
@@ -416,16 +548,32 @@ class TinecoBatterySensor(TinecoBaseSensor):
         self._attr_device_class = "battery"
         self._attr_native_unit_of_measurement = "%"
 
-    def _update_state_from_data(self, info: Dict):
-        """Update state from device info."""
+    async def _restore_last_value(self) -> None:
+        """Restore the last battery reading across a restart (RestoreSensor)."""
+        last_data = await self.async_get_last_sensor_data()
+        if last_data is not None and last_data.native_value is not None:
+            try:
+                self._state = max(0, min(100, int(round(float(last_data.native_value)))))
+                self._has_value = True
+            except (ValueError, TypeError):
+                pass
+
+    def _apply_state_from_data(self, info: Dict):
+        """Update state from device info.
+
+        Issue #35: once we have a real reading, a later empty refresh must KEEP
+        the previous value rather than reset to None. We only leave the state
+        None/unknown before the very first real reading.
+        """
         percent = self._extract_battery_percent(info)
         if percent is not None:
             try:
                 self._state = max(0, min(100, int(round(float(percent)))))
             except Exception:
-                self._state = None
-        else:
-            self._state = None
+                # Bad value: keep the last known reading rather than blanking.
+                pass
+        # No reading found: intentionally keep the previous value. _state stays
+        # None only until the very first real reading arrives.
 
     def _extract_battery_percent(self, info: Dict):
         """Attempt to find battery percentage across known payloads."""
@@ -490,7 +638,7 @@ class TinecoBatterySensor(TinecoBaseSensor):
         except Exception:
             return None
 
-class TinecoWaterTankSensor(TinecoBaseSensor):
+class TinecoWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
     """Sensor for water tank status."""
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
@@ -501,7 +649,18 @@ class TinecoWaterTankSensor(TinecoBaseSensor):
         self._attr_options = ["clean", "full"]
         self._attr_translation_key = "waste_water_tank_status"
 
-    def _update_state_from_data(self, info: Dict):
+    async def _restore_last_value(self) -> None:
+        """Restore the last waste-tank status across a restart (RestoreEntity).
+
+        Retains the last reported tank state so a brief offline window shows
+        the last known value rather than going unavailable.
+        """
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in self._attr_options:
+            self._state = last_state.state
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
         """Update state from device info."""
         try:
             payload = None
@@ -588,7 +747,7 @@ class TinecoWaterTankSensor(TinecoBaseSensor):
             return "mdi:water"
 
 
-class TinecoFreshWaterTankSensor(TinecoBaseSensor):
+class TinecoFreshWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
     """Sensor for fresh water tank status."""
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
@@ -599,7 +758,18 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
         self._attr_options = ["empty", "full"]
         self._attr_translation_key = "fresh_water_tank_status"
 
-    def _update_state_from_data(self, info: Dict):
+    async def _restore_last_value(self) -> None:
+        """Restore the last fresh-tank status across a restart (RestoreEntity).
+
+        Retains the last reported tank state so a brief offline window shows
+        the last known value rather than going unavailable.
+        """
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in self._attr_options:
+            self._state = last_state.state
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
         """Update state from device info."""
         try:
             payload = None
@@ -687,7 +857,7 @@ class TinecoFreshWaterTankSensor(TinecoBaseSensor):
         return "mdi:water-check"
 
 
-class TinecoBrushRollerSensor(TinecoBaseSensor):
+class TinecoBrushRollerSensor(TinecoRetainingSensor, RestoreEntity):
     """Sensor for brush roller status."""
 
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
@@ -698,7 +868,18 @@ class TinecoBrushRollerSensor(TinecoBaseSensor):
         self._attr_options = ["normal", "tangled", "stuck", "needs_cleaning"]
         self._attr_translation_key = "brush_roller"
 
-    def _update_state_from_data(self, info: Dict):
+    async def _restore_last_value(self) -> None:
+        """Restore the last brush-roller status across a restart (RestoreEntity).
+
+        Retains the last reported state so a brief offline window shows the
+        last known value rather than going unavailable.
+        """
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in self._attr_options:
+            self._state = last_state.state
+            self._has_value = True
+
+    def _apply_state_from_data(self, info: Dict):
         """Update state from device info."""
         try:
             payload = None

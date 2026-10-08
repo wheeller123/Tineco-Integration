@@ -14,54 +14,23 @@ Two rules for contributors:
 ## [Unreleased]
 
 ### Fixed
-- Floor Brush Light switch appearing on models that have no floor brush light,
-  where it reported success and changed nothing (#33, Floor One S5 Combo). The
-  `led` field is absent from these devices' `gci` payload, but the cloud API
-  accepts `{'led': 0}` and answers with a normal success response, so neither
-  the command nor the state read could tell the switch was a no-op.
-  - `switch.async_setup_entry` now checks the coordinator's first `gci` payload
-    and skips `TinecoFloorBrushLightSwitch` when `led` is absent. Only `gci` is
-    consulted — `cfp` omits `led` even on models that do have the light, so its
-    absence there proves nothing.
-  - Absence of a `gci` payload (failed first refresh, timed-out endpoint) counts
-    as *unknown*, not unsupported, so a transient API failure can't drop the
-    switch for a device that does have the light. Such an entity marks itself
-    unavailable and refuses commands as soon as a payload settles the question.
-  - An entity left in the registry by an earlier version is removed on setup, so
-    affected users don't keep a permanently unavailable switch.
-- Added `tests/fixtures/s5_combo_no_led.json` (captured from the #33 debug log)
-  and `tests/test_switch_capabilities.py`. Confirms the Floor One S5 Combo as a
-  working model apart from the brush light.
-
-### Added
-- Floor One S5 Combo listed as a confirmed model. Battery, vacuum status, water
-  tank tracking and all mode/power/suction selects were verified working by the
-  reporter of #33.
-
-## [v2.4.3] - 2026-07-29
-
-### Fixed
-- Blocking calls in the Home Assistant event loop during startup (reported as
-  `Detected blocking call to load_verify_locations ... tineco_client_impl.py,
-  line 134`). `TinecoClient.__init__` resolved the IoT datacenter with a
-  synchronous `requests` GET, and the constructor was invoked on the event loop
-  from `async_setup_entry` → `async_login`, from `TinecoConfigFlow.__init__`,
-  and from the `switch`/`select` client-fallback paths.
-  - The datacenter lookup is now lazy: `IOT_API_BASE` / `IOT_LOGIN_ENDPOINT`
-    are properties resolving `dc` on first read (cached, thread-safe), and
-    `login()` warms it while already in an executor. Construction does no I/O.
-  - `TinecoDeviceClient` takes `hass` and dispatches every blocking call via
-    `hass.async_add_executor_job`, replacing the deprecated
-    `asyncio.get_event_loop().run_in_executor` (removed in favour of the HA
-    helper; `get_event_loop` warns from Python 3.12).
-  - `TinecoConfigFlow.__init__` no longer builds a throwaway client just to read
-    a device ID — it reads the new `TinecoClient.DEFAULT_DEVICE_ID` constant
-    (same value as before, so login signatures are unchanged). The real client
-    is constructed inside the executor alongside `login()`.
-  - The seven duplicated client-fallback blocks in `switch.py` / `select.py` are
-    replaced by `client.async_get_or_create_client()`, which always passes
-    `hass`, `device_id` and `region` (the fallbacks previously dropped the last
-    two, silently logging in against the default device ID and region `IE`).
+- Issue #35: sensors no longer go **unavailable** the moment the device drops
+  offline. Because every entity subclassed `CoordinatorEntity` with no custom
+  `available`, a failed coordinator refresh (e.g. the S11 handheld only reports
+  online while its trigger is held) immediately blanked every sensor. The
+  battery sensor plus the firmware, API, model, vacuum status, waste-water
+  tank, fresh-water tank and brush-roller sensors now **retain** their last
+  reported value across offline periods (battery is the primary target — an
+  empty refresh keeps the last reading instead of resetting to `None`) and
+  **restore** it on restart via `RestoreSensor` (battery) / `RestoreEntity`
+  (the enum/text sensors). The `online` and `charging` binary sensors
+  deliberately do **not** retain: `online` *is* the availability signal, and a
+  retained "charging while offline" would misreport the live state.
+- Hassfest `[REQUIREMENTS]` validation failure: removed `requests>=2.28.0`
+  from `custom_components/tineco/manifest.json`. `requests` is a dependency of
+  Home Assistant core, so hassfest forbids custom integrations from listing it
+  in their manifest. The library is still provided by HA at runtime, so there
+  is no behavior change.
 
 ### Added
 - Release guardrails encoding lessons from past releases:

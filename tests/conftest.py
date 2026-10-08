@@ -59,6 +59,9 @@ def make_sensor(cls, *, devices=None, email="user@example.com", entry_id="test_e
 
     sensor = cls.__new__(cls)
     sensor._state = None
+    # Retaining sensors (TinecoRetainingSensor) track whether a real value has
+    # ever been seen; mirror the __init__ default since __new__ skips it.
+    sensor._has_value = False
     sensor.config_entry = types.SimpleNamespace(entry_id=entry_id, data={"email": email})
     fake_client = types.SimpleNamespace(devices=list(devices or []))
     sensor.hass = types.SimpleNamespace(
