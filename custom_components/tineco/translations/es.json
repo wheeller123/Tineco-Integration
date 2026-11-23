@@ -70,7 +70,74 @@
         "name": "Estado del Tanque de Aguas Residuales",
         "state": {
           "clean": "Limpio",
-          "dirty": "Sucio"
+          "full": "Lleno"
+        }
+      },
+      "fresh_water_tank_status": {
+        "name": "Estado del Tanque de Agua Limpia",
+        "state": {
+          "empty": "Vacío",
+          "full": "Lleno"
+        }
+      },
+      "brush_roller": {
+        "name": "Rodillo de cepillo",
+        "state": {
+          "normal": "Normal",
+          "tangled": "Enredado",
+          "stuck": "Atascado",
+          "needs_cleaning": "Necesita limpieza"
+        }
+      }
+    },
+    "select": {
+      "volume_level": {
+        "name": "Sonido: Nivel de volumen",
+        "state": {
+          "low": "Bajo",
+          "medium": "Medio",
+          "high": "Alto"
+        }
+      },
+      "running_speed": {
+        "name": "Velocidad de marcha",
+        "state": {
+          "soft": "Suave",
+          "medium": "Media",
+          "max": "Máxima"
+        }
+      },
+      "cleaning_method": {
+        "name": "Método de limpieza",
+        "state": {
+          "clean_water": "Agua limpia",
+          "detergent": "Detergente"
+        }
+      },
+      "suction_power": {
+        "name": "Modo de succión: Potencia"
+      },
+      "max_power": {
+        "name": "Modo MAX: Potencia"
+      },
+      "max_spray_volume": {
+        "name": "Modo MAX: Volumen de pulverización",
+        "state": {
+          "rinse": "Enjuague",
+          "max": "Máximo"
+        }
+      },
+      "water_mode_power": {
+        "name": "Modo agua: Potencia"
+      },
+      "water_mode_spray_volume": {
+        "name": "Modo agua: Volumen de pulverización",
+        "state": {
+          "mist": "Niebla",
+          "wet": "Húmedo",
+          "medium": "Medio",
+          "rinse": "Enjuague",
+          "max": "Máximo"
         }
       }
     },

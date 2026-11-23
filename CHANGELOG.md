@@ -13,6 +13,23 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+### Changed (breaking)
+- Issue #40: select option values are now stable lowercase keys, so their
+  labels can be translated. **Update automations and scripts** that set or
+  compare these values:
+
+  | Select | Old values | New values |
+  |---|---|---|
+  | Sound: Volume Level | `Low` `Medium` `High` | `low` `medium` `high` |
+  | Running Speed | `Soft` `Medium` `Max` | `soft` `medium` `max` |
+  | Cleaning Method | `Clean water` `Detergent` | `clean_water` `detergent` |
+  | MAX Mode: Spray Volume | `Rinse` `Max` | `rinse` `max` |
+  | Water Mode: Spray Volume | `Mist` `Wet` `Medium` `Rinse` `Max` | `mist` `wet` `medium` `rinse` `max` |
+
+  Watt options (`90W`/`120W`/`150W`) and the values sent to the device are
+  unchanged. Entity names and entity IDs are unchanged. The UI still shows
+  "Low", "Rinse" and so on, now translated into the Home Assistant language.
+
 ### Fixed
 - Issue #35: sensors no longer go **unavailable** the moment the device drops
   offline. Because every entity subclassed `CoordinatorEntity` with no custom
@@ -47,8 +64,15 @@ Two rules for contributors:
   and its answer is accepted only if it names one of the four known
   datacenters (`cn`/`as`/`na`/`eu`). All other traffic, including login and
   device control, is still certificate-verified.
+- Translations for the waste-water tank listed a `dirty` state that the sensor
+  never reports, so `full` was shown untranslated. The fresh-water tank and
+  brush-roller states had no translations at all. All enum sensor states are
+  now translated in every language.
 
 ### Added
+- French translation (`fr.json`) covering the config flow, options, sensors,
+  selects and binary sensors (#40).
+- Select option labels translated in English, Spanish and French (#40).
 - Release guardrails encoding lessons from past releases:
   - `scripts/check_release_consistency.py` verifies manifest version is valid
     semver, `documentation`/`issue_tracker` URLs point at this repo, the README

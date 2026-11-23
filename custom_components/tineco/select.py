@@ -11,24 +11,28 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "tineco"
 
+# Option values are stable lowercase keys (issue #40): Home Assistant shows
+# translated labels from entity.select.<translation_key>.state.<key>, so these
+# keys must not change. Watt options are not translated and stay as-is.
+
 # Volume level mapping
 VOLUME_LEVELS = {
-    "Low": 1,
-    "Medium": 2,
-    "High": 3,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
 }
 
 # Running speed mapping
 RUNNING_SPEED_LEVELS = {
-    "Soft": 0,
-    "Medium": 1,
-    "Max": 2,
+    "soft": 0,
+    "medium": 1,
+    "max": 2,
 }
 
 # Cleaning method mapping
 CLEANING_METHOD_LEVELS = {
-    "Clean water": 0,
-    "Detergent": 1,
+    "clean_water": 0,
+    "detergent": 1,
 }
 
 # Suction power mapping (120W or 150W)
@@ -45,17 +49,17 @@ MAX_POWER_LEVELS = {
 
 # MAX mode spray volume mapping (only Rinse or Max)
 MAX_SPRAY_VOLUME_LEVELS = {
-    "Rinse": 3,
-    "Max": 4,
+    "rinse": 3,
+    "max": 4,
 }
 
 # Water mode spray volume mapping (Mist, Wet, Medium, Rinse, Max)
 WATER_MODE_SPRAY_VOLUME_LEVELS = {
-    "Mist": 0,
-    "Wet": 1,
-    "Medium": 2,
-    "Rinse": 3,
-    "Max": 4,
+    "mist": 0,
+    "wet": 1,
+    "medium": 2,
+    "rinse": 3,
+    "max": 4,
 }
 
 # Water mode power mapping (90W, 120W, 150W)
@@ -249,7 +253,8 @@ class TinecoVolumeSelect(SelectEntity):
         self.hass = hass
         self._attr_should_poll = True
         self._attr_options = list(VOLUME_LEVELS.keys())
-        self._attr_current_option = "Low"
+        self._attr_current_option = "low"
+        self._attr_translation_key = "volume_level"
         self._last_command_time = None
         
         email = config_entry.data.get("email", "")
@@ -376,6 +381,8 @@ class TinecoBaseSelect(SelectEntity):
         self._attr_current_option = list(options_dict.keys())[0]
         self._last_command_time = None
         self._attr_icon = icon
+        # Lets HA translate option labels via entity.select.<select_type>.state.
+        self._attr_translation_key = select_type
 
         email = config_entry.data.get("email", "")
         self._attr_unique_id = f"{DOMAIN}_{email}_{select_type}"

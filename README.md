@@ -78,7 +78,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
   - Grouped entity naming for easy organization
 - **Configuration UI**: Setup through the Home Assistant UI
 - **Multi-region**: Global (`IE`, `US`, …) and China (`CN`) — the integration picks the correct host, org, and country at runtime
-- **Multi-language**: English and Spanish
+- **Multi-language**: English, Spanish and French
 
 
 ## Installation
@@ -129,12 +129,16 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
   the cloud API still reports success*
 
 ### Selects
-- `select.tineco_sound_volume_level` — Low / Medium / High
+
+Option values are lowercase keys (in brackets). The UI shows a translated
+label; automations use the key, e.g. `option: rinse`.
+
+- `select.tineco_sound_volume_level` — Low / Medium / High (`low` / `medium` / `high`)
 - `select.tineco_suction_mode_power` — 120W / 150W
 - `select.tineco_max_mode_power` — 120W / 150W
-- `select.tineco_max_mode_spray_volume` — Rinse / Max
+- `select.tineco_max_mode_spray_volume` — Rinse / Max (`rinse` / `max`)
 - `select.tineco_water_mode_power` — 90W / 120W / 150W *(unavailable when water mode is off)*
-- `select.tineco_water_mode_spray_volume` — Mist / Wet / Medium / Rinse / Max *(unavailable when water mode is off)*
+- `select.tineco_water_mode_spray_volume` — Mist / Wet / Medium / Rinse / Max (`mist` / `wet` / `medium` / `rinse` / `max`) *(unavailable when water mode is off)*
 
 ### Binary sensors
 - `binary_sensor.tineco_online`
