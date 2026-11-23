@@ -644,7 +644,7 @@ class TinecoWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
         """Initialize."""
         super().__init__(config_entry, "waste_water_tank_status", hass, coordinator)
-        self._state = "clean"
+        self._state = None
         self._attr_device_class = SensorDeviceClass.ENUM
         self._attr_options = ["clean", "full"]
         self._attr_translation_key = "waste_water_tank_status"
@@ -672,18 +672,12 @@ class TinecoWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
                 elif 'cfp' in info and isinstance(info['cfp'], dict):
                     payload = info['cfp']
             
-            if payload:
-                status = self._parse_water_tank_status(payload)
-                if status:
-                    self._state = status
-                    return
-            
-            # Default to clean if we can't determine
-            self._state = "clean"
-            
+            # None (unknown) when the device reports no waste-tank signal.
+            self._state = self._parse_water_tank_status(payload) if payload else None
+
         except Exception as err:
             _LOGGER.error(f"Error parsing water tank status: {err}", exc_info=True)
-            self._state = "clean"
+            self._state = None
 
     def _parse_water_tank_status(self, payload: Dict) -> Optional[str]:
         """Parse waste (dirty) water tank status from payload.
@@ -701,12 +695,16 @@ class TinecoWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
         single-value fallback.
 
         We only conclude "clean" once every available signal has been checked
-        and none flagged full.
+        and none flagged full. If the payload carries none of these fields
+        (e.g. Floor One S5, issue #36) the state is unknown, so return None
+        rather than a fabricated "clean".
         """
         if not isinstance(payload, dict):
             return None
 
         fields = _extract_values(payload, ["e2", "e3", "e1"])
+        if not fields:
+            return None
 
         # Definitive signal on the S7 Flashdry: e2 bit 256 == waste tank full.
         e2 = fields.get("e2")
@@ -753,7 +751,7 @@ class TinecoFreshWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
     def __init__(self, config_entry: ConfigEntry, hass: HomeAssistant, coordinator):
         """Initialize."""
         super().__init__(config_entry, "fresh_water_tank_status", hass, coordinator)
-        self._state = "full"
+        self._state = None
         self._attr_device_class = SensorDeviceClass.ENUM
         self._attr_options = ["empty", "full"]
         self._attr_translation_key = "fresh_water_tank_status"
@@ -781,18 +779,12 @@ class TinecoFreshWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
                 elif 'cfp' in info and isinstance(info['cfp'], dict):
                     payload = info['cfp']
             
-            if payload:
-                status = self._parse_fresh_water_status(payload)
-                if status:
-                    self._state = status
-                    return
-            
-            # Default to full if we can't determine
-            self._state = "full"
-            
+            # None (unknown) when the device reports no fresh-tank signal.
+            self._state = self._parse_fresh_water_status(payload) if payload else None
+
         except Exception as err:
             _LOGGER.error(f"Error parsing fresh water tank status: {err}", exc_info=True)
-            self._state = "full"
+            self._state = None
 
     def _parse_fresh_water_status(self, payload: Dict) -> Optional[str]:
         """Parse fresh (clean) water tank status from payload.
@@ -813,11 +805,17 @@ class TinecoFreshWaterTankSensor(TinecoRetainingSensor, RestoreEntity):
 
         ``e3`` bit 13 (warning code 45) is also honoured for firmware that
         reports tank state through the e3 bitmask instead.
+
+        If the payload carries none of these fields (e.g. Floor One S5
+        FW103000US, issue #36) the tank state is unknown, so return None
+        rather than a fabricated "full".
         """
         if not isinstance(payload, dict):
             return None
 
         fields = _extract_values(payload, ["e2", "e3", "wp"])
+        if not fields:
+            return None
 
         # Definitive signal on the S7 Flashdry: e2 bit 64 == clean tank empty.
         e2 = fields.get("e2")

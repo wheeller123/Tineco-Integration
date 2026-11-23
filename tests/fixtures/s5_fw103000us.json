@@ -1,0 +1,28 @@
+{
+  "_source": "Issue #36 sanitized debug log (home-assistant_tineco_2026-08-17_sanitized.log), Floor One S5 FW103000US, firmware CL2019Z-12, region CA (dc=na), integration v2.4.2, HA 2026.7.2.",
+  "_regression_note": "The Floor One S5 gci payload carries no tank fields (no e1/e2/e3/wp) in any captured state, including with the fresh tank empty. The fresh-water sensor used to fall through to a hard-coded 'full' (and the waste sensor to 'clean'); both must report unknown (None) for this payload shape.",
+  "devices": [
+    {
+      "did": "00000000-0000-4000-8000-000000000036",
+      "nick": "Floor One S5",
+      "productType": "Floor One S5",
+      "productName": "Floor One S5"
+    }
+  ],
+  "info": {
+    "gci": {
+      "wm": 2,
+      "cds": 1,
+      "smr": 0,
+      "wdr": 0,
+      "mdr": 1,
+      "msr": 1,
+      "vl": 4,
+      "sr": 2,
+      "bp": 95,
+      "dv": 0,
+      "e": 0,
+      "bc": 3720
+    }
+  }
+}

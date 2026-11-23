@@ -31,6 +31,13 @@ Two rules for contributors:
   Home Assistant core, so hassfest forbids custom integrations from listing it
   in their manifest. The library is still provided by HA at runtime, so there
   is no behavior change.
+- Issue #36: on devices that report no tank fields (Floor One S5
+  `FW103000US`, Floor One S5 Combo), the fresh-water tank sensor was stuck on
+  `full` and the waste-water tank sensor on `clean`. Both values were
+  hard-coded fallbacks, not readings: these models' `gci` payload carries none
+  of `e1`/`e2`/`e3`/`wp`. Both tank sensors now report **unknown** when no tank
+  signal is present, and still decode `e2`/`e3`/`wp`/`e1` exactly as before on
+  models that send them.
 
 ### Added
 - Release guardrails encoding lessons from past releases:

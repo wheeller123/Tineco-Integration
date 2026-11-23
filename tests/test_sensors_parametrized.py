@@ -41,6 +41,11 @@ SENSOR_CLASSES = [
 
 BAD_STATES = {None, "Unknown", "Tineco Device"}
 
+# Fixtures whose payloads carry no tank fields (no e1/e2/e3/wp). Tank sensors
+# must report unknown (None) for these rather than a fabricated value (#36).
+NO_TANK_FIXTURES = {"s5_combo_no_led", "s5_fw103000us"}
+TANK_SENSORS = {TinecoWaterTankSensor, TinecoFreshWaterTankSensor}
+
 
 def _all_fixtures():
     """Yield (fixture_name, fixture_dict) for every JSON in the fixtures dir."""
@@ -58,6 +63,10 @@ def test_sensor_produces_usable_state(fixture_name, fixture_data, sensor_cls):
 
     sensor = make_sensor(sensor_cls, devices=devices)
     sensor._update_state_from_data(info)
+
+    if sensor_cls in TANK_SENSORS and fixture_name in NO_TANK_FIXTURES:
+        assert sensor._state is None
+        return
 
     assert sensor._state not in BAD_STATES, (
         f"{sensor_cls.__name__} produced sentinel state {sensor._state!r} "
