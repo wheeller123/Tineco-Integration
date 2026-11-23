@@ -38,6 +38,11 @@ gates the PR — don't merge red.
 since the previous release. On release day, rename the heading to
 `## [vX.Y.Z] - YYYY-MM-DD` and bump the link references at the bottom.
 
+That section becomes the GitHub release notes (`release.yml` appends it via
+`scripts/release_notes.py`), and HACS shows those notes in Home Assistant's
+update dialog. Put breaking changes first, under `### Breaking changes`, with
+the exact old → new values users must change.
+
 ## 3. Manifest version matches the tag
 
 ```

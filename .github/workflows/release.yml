@@ -65,10 +65,18 @@ jobs:
           cd custom_components
           zip -r ../tineco.zip tineco/
 
+      # HACS shows the release body in HA's update dialog, so publish the
+      # CHANGELOG section (incl. breaking changes) there.
+      - name: Build release notes
+        if: github.event_name == 'release'
+        run: python scripts/release_notes.py "${GITHUB_REF#refs/tags/}" > release_notes.md
+
       - name: Upload release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: tineco.zip
+          body_path: release_notes.md
+          append_body: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

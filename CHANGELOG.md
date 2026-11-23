@@ -13,10 +13,13 @@ Two rules for contributors:
 
 ## [Unreleased]
 
-### Changed (breaking)
-- Issue #40: select option values are now stable lowercase keys, so their
-  labels can be translated. **Update automations and scripts** that set or
-  compare these values:
+## [v2.5.0] - 2026-11-23
+
+### Breaking changes
+- **Select option values changed (issue #40).** Before updating, check any
+  automation, script or dashboard that sets or compares a Tineco select's
+  value, and change it to the new value below. Select option values are now
+  stable lowercase keys, so their labels can be translated:
 
   | Select | Old values | New values |
   |---|---|---|
