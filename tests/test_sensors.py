@@ -259,6 +259,20 @@ def test_fresh_water_tank_full_when_only_waste_full_bit_set():
     assert sensor._state == "full"
 
 
+@pytest.mark.parametrize("sensor_cls", [TinecoWaterTankSensor, TinecoFreshWaterTankSensor])
+def test_tank_sensors_unknown_without_tank_fields(load_fixture, sensor_cls):
+    """Issue #36: Floor One S5 reports no e1/e2/e3/wp, so tank state is unknown
+    (None) - not a hard-coded 'full'/'clean' - and a prior value is cleared."""
+    fx = load_fixture("s5_fw103000us")
+    sensor = make_sensor(sensor_cls, devices=fx["devices"])
+    sensor._state = "full" if sensor_cls is TinecoFreshWaterTankSensor else "clean"
+
+    sensor._update_state_from_data(fx["info"])
+
+    assert sensor._state is None
+    assert sensor._has_value is False
+
+
 def test_brush_roller_normal_when_no_br_field(load_fixture):
     """Default to 'normal' when the device doesn't report a brush-roller state."""
     fx = load_fixture("s7_flashdry")

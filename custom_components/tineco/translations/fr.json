@@ -1,0 +1,158 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Compte Tineco IoT",
+        "description": "Saisissez vos identifiants Tineco. Sélectionnez la région correspondant à l'inscription dans l'application mobile.",
+        "data": {
+          "email": "E-mail ou numéro de téléphone",
+          "password": "Mot de passe",
+          "region": "Région (par défaut : IE)"
+        }
+      },
+      "otp": {
+        "title": "Vérification de l'appareil",
+        "description": "Un code de vérification a été envoyé à {account}. Saisissez ci-dessous le code à 6 chiffres pour autoriser cette instance de Home Assistant.",
+        "data": {
+          "code": "Code de vérification"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Identifiants invalides",
+      "invalid_code": "Code de vérification invalide",
+      "cannot_connect": "Impossible de se connecter aux serveurs Tineco",
+      "unknown": "Une erreur inconnue s'est produite"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paramètres Tineco",
+        "description": "Configurez la fréquence d'interrogation de l'état de l'appareil (30 à 3600 secondes)",
+        "data": {
+          "scan_interval": "Intervalle de mise à jour (secondes)",
+          "region": "Région du serveur"
+        },
+        "data_description": {
+          "scan_interval": "Fréquence de vérification de l'état de l'appareil. Des valeurs plus faibles donnent des mises à jour plus rapides mais peuvent augmenter l'utilisation de l'API. Par défaut : 60 secondes.",
+          "region": "La région du serveur utilisée pour les requêtes API."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "device_status": {
+        "name": "État de l'appareil"
+      },
+      "firmware_version": {
+        "name": "Version du firmware"
+      },
+      "api_version": {
+        "name": "Version de l'API"
+      },
+      "model": {
+        "name": "Modèle"
+      },
+      "battery": {
+        "name": "Batterie"
+      },
+      "vacuum_status": {
+        "name": "État de l'aspirateur",
+        "state": {
+          "idle": "Inactif",
+          "in_operation": "En fonctionnement",
+          "self_cleaning": "Autonettoyage"
+        }
+      },
+      "waste_water_tank_status": {
+        "name": "État du réservoir d'eau sale",
+        "state": {
+          "clean": "Propre",
+          "full": "Plein"
+        }
+      },
+      "fresh_water_tank_status": {
+        "name": "État du réservoir d'eau propre",
+        "state": {
+          "empty": "Vide",
+          "full": "Plein"
+        }
+      },
+      "brush_roller": {
+        "name": "Rouleau-brosse",
+        "state": {
+          "normal": "Normal",
+          "tangled": "Emmêlé",
+          "stuck": "Bloqué",
+          "needs_cleaning": "Nettoyage nécessaire"
+        }
+      }
+    },
+    "select": {
+      "volume_level": {
+        "name": "Son : Niveau du volume",
+        "state": {
+          "low": "Faible",
+          "medium": "Moyen",
+          "high": "Élevé"
+        }
+      },
+      "running_speed": {
+        "name": "Vitesse d'avancement",
+        "state": {
+          "soft": "Douce",
+          "medium": "Moyenne",
+          "max": "Maximale"
+        }
+      },
+      "cleaning_method": {
+        "name": "Méthode de nettoyage",
+        "state": {
+          "clean_water": "Eau claire",
+          "detergent": "Détergent"
+        }
+      },
+      "suction_power": {
+        "name": "Mode aspiration : Puissance"
+      },
+      "max_power": {
+        "name": "Mode MAX : Puissance"
+      },
+      "max_spray_volume": {
+        "name": "Mode MAX : Débit de pulvérisation",
+        "state": {
+          "rinse": "Rinçage",
+          "max": "Maximum"
+        }
+      },
+      "water_mode_power": {
+        "name": "Mode eau : Puissance"
+      },
+      "water_mode_spray_volume": {
+        "name": "Mode eau : Débit de pulvérisation",
+        "state": {
+          "mist": "Brume",
+          "wet": "Humide",
+          "medium": "Moyen",
+          "rinse": "Rinçage",
+          "max": "Maximum"
+        }
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Alimentation"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "En ligne"
+      },
+      "charging": {
+        "name": "En charge"
+      }
+    }
+  }
+}

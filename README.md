@@ -2,7 +2,7 @@
 
 Control your Tineco smart devices through Home Assistant using this custom integration.
 
-Current version: **2.4.3** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro / S5 Combo) work with community feedback.
+Current version: **2.5.0** — supports global (`IE`, `US`, etc.) and China (`CN`) regions. Developed against the S7 Flashdry; other models (incl. Floor One S5 / S5 Pro / S5 Combo) work with community feedback.
 
 ### Community Lovelace Card
 
@@ -10,6 +10,32 @@ A custom Lovelace card for Tineco devices is available: [lovelace-tineco-card](h
 
 
 ## What's New
+
+### 2.5.0
+
+> **Breaking change: select option values.** Automations, scripts or
+> dashboards that set or compare a Tineco select's value must use the new
+> lowercase values. The UI labels look the same and are now translated.
+>
+> | Select | Old | New |
+> |---|---|---|
+> | Sound: Volume Level | `Low` `Medium` `High` | `low` `medium` `high` |
+> | Running Speed | `Soft` `Medium` `Max` | `soft` `medium` `max` |
+> | Cleaning Method | `Clean water` `Detergent` | `clean_water` `detergent` |
+> | MAX Mode: Spray Volume | `Rinse` `Max` | `rinse` `max` |
+> | Water Mode: Spray Volume | `Mist` `Wet` `Medium` `Rinse` `Max` | `mist` `wet` `medium` `rinse` `max` |
+>
+> Example: `option: Rinse` becomes `option: rinse`. Watt options (`120W` etc.)
+> and entity IDs are unchanged.
+
+- **French translation**, plus translated select options in English, Spanish
+  and French. (#40)
+- **Sensors keep their last value while the device is offline**, and restore it
+  after a restart, instead of going unavailable. Useful for handhelds like the
+  S11 that are only online while in use. (#35)
+- **Tank sensors show *unknown* on models that don't report tank state**
+  (e.g. Floor One S5), instead of a permanent "full"/"clean". (#36)
+- **No more SSL warnings at startup** from the datacenter lookup. (#37)
 
 ### 2.4.3
 
@@ -78,7 +104,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
   - Grouped entity naming for easy organization
 - **Configuration UI**: Setup through the Home Assistant UI
 - **Multi-region**: Global (`IE`, `US`, …) and China (`CN`) — the integration picks the correct host, org, and country at runtime
-- **Multi-language**: English and Spanish
+- **Multi-language**: English, Spanish and French
 
 
 ## Installation
@@ -129,12 +155,16 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history.
   the cloud API still reports success*
 
 ### Selects
-- `select.tineco_sound_volume_level` — Low / Medium / High
+
+Option values are lowercase keys (in brackets). The UI shows a translated
+label; automations use the key, e.g. `option: rinse`.
+
+- `select.tineco_sound_volume_level` — Low / Medium / High (`low` / `medium` / `high`)
 - `select.tineco_suction_mode_power` — 120W / 150W
 - `select.tineco_max_mode_power` — 120W / 150W
-- `select.tineco_max_mode_spray_volume` — Rinse / Max
+- `select.tineco_max_mode_spray_volume` — Rinse / Max (`rinse` / `max`)
 - `select.tineco_water_mode_power` — 90W / 120W / 150W *(unavailable when water mode is off)*
-- `select.tineco_water_mode_spray_volume` — Mist / Wet / Medium / Rinse / Max *(unavailable when water mode is off)*
+- `select.tineco_water_mode_spray_volume` — Mist / Wet / Medium / Rinse / Max (`mist` / `wet` / `medium` / `rinse` / `max`) *(unavailable when water mode is off)*
 
 ### Binary sensors
 - `binary_sensor.tineco_online`

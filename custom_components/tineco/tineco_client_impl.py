@@ -4,11 +4,13 @@ Tineco IoT API Client Implementation.
 import json
 import logging
 import requests
-from requests.exceptions import SSLError, Timeout
+from requests.exceptions import Timeout
+from urllib3.exceptions import InsecureRequestWarning
 import hashlib
 import threading
 import time
 import uuid
+import warnings
 from typing import Dict, Optional, Tuple
 
 _LOGGER = logging.getLogger(__name__)
@@ -156,38 +158,38 @@ class TinecoClient:
     }
 
     def _resolve_iot_datacenter(self) -> str:
-        """Resolve the IoT datacenter code for the configured region via Tineco API."""
+        """Resolve the IoT datacenter code for the configured region via Tineco API.
+
+        ``api-base.robot{ww,cn}.ecouser.net`` serves a certificate signed by a
+        private "ECOVACS CA", so TLS verification against the system trust
+        store can never succeed (issue #37). The request is therefore made
+        unverified in a single attempt. It carries no credentials (only the
+        region code), and the answer is accepted only if it is one of the known
+        datacenters, so the worst a tampered response can do is pick another
+        genuine Tineco datacenter; every subsequent call is verified as normal.
+        """
         VALID_DCS = {"cn", "as", "na", "eu"}
         vendor = "cn" if self._is_china_region() else "ww"
         url = f"https://api-base.robot{vendor}.ecouser.net/api/basis/dc/get-by-area?area={self.region.lower()}"
 
         _LOGGER.debug("Tineco: DC lookup URL: %s", url)
 
-        # Attempt API lookup, retrying without SSL verification on cert errors
-        for attempt, verify_ssl in enumerate((True, False), 1):
-            try:
-                if attempt == 2:
-                    _LOGGER.warning("Tineco: retrying DC lookup without SSL verification")
-                response = self.session.get(url, timeout=5, verify=verify_ssl)
-                _LOGGER.debug("Tineco: DC lookup response (attempt %d): HTTP %s — %s", attempt, response.status_code, response.text[:200])
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get("code") == 0:
-                        dc = data.get("data", {}).get("dc", "")
-                        if dc in VALID_DCS:
-                            _LOGGER.info("Tineco: resolved IoT datacenter for region %s: %s", self.region, dc)
-                            return dc
-                        _LOGGER.warning("Tineco: unexpected DC value '%s' for region %s", dc, self.region)
-                        break
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", InsecureRequestWarning)
+                response = self.session.get(url, timeout=5, verify=False)
+            _LOGGER.debug("Tineco: DC lookup response: HTTP %s — %s", response.status_code, response.text[:200])
+            if response.status_code == 200:
+                data = response.json()
+                dc = data.get("data", {}).get("dc", "") if data.get("code") == 0 else ""
+                if dc in VALID_DCS:
+                    _LOGGER.info("Tineco: resolved IoT datacenter for region %s: %s", self.region, dc)
+                    return dc
+                _LOGGER.warning("Tineco: unexpected DC lookup response for region %s: %s", self.region, data)
+            else:
                 _LOGGER.warning("Tineco: DC lookup failed (HTTP %s)", response.status_code)
-                break  # non-SSL HTTP error, no point retrying
-            except SSLError as e:
-                _LOGGER.warning("Tineco: DC lookup SSL error: %s", e)
-                if attempt == 2:
-                    break  # both attempts failed
-            except Exception as e:
-                _LOGGER.warning("Tineco: DC lookup error: %s", e)
-                break  # non-SSL error, no point retrying
+        except Exception as e:
+            _LOGGER.warning("Tineco: DC lookup error: %s", e)
 
         # Static fallback based on region geography
         fallback = self.REGION_DC_MAP.get(self.region.lower(), "eu")

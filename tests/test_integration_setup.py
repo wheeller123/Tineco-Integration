@@ -122,3 +122,31 @@ async def test_setup_entry_handles_login_failure_gracefully(hass: HomeAssistant)
         # Should not raise — the integration logs a warning and continues.
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
+
+
+@pytest.mark.asyncio
+async def test_select_options_are_translated_by_home_assistant(hass: HomeAssistant, mock_tineco_device_client):
+    """Issue #40: selects expose stable keys and HA resolves French labels."""
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers.translation import async_get_translations
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"email": "fr@example.com", "password": "pw", "device_id": "dev-1", "region": "FR"},
+        unique_id="fr@example.com",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id) is True
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id("select", DOMAIN, f"{DOMAIN}_fr@example.com_volume_level")
+    assert registry.async_get(entity_id).translation_key == "volume_level"
+    state = hass.states.get(entity_id)
+    assert state.state == "low"  # gci vl=1
+    assert state.attributes["options"] == ["low", "medium", "high"]
+
+    fr = await async_get_translations(hass, "fr", "entity", {DOMAIN})
+    prefix = f"component.{DOMAIN}.entity.select"
+    assert fr[f"{prefix}.volume_level.state.low"] == "Faible"
+    assert fr[f"{prefix}.water_mode_spray_volume.state.rinse"] == "Rinçage"

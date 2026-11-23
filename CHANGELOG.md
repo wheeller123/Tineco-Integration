@@ -13,6 +13,26 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+## [v2.5.0] - 2026-11-23
+
+### Breaking changes
+- **Select option values changed (issue #40).** Before updating, check any
+  automation, script or dashboard that sets or compares a Tineco select's
+  value, and change it to the new value below. Select option values are now
+  stable lowercase keys, so their labels can be translated:
+
+  | Select | Old values | New values |
+  |---|---|---|
+  | Sound: Volume Level | `Low` `Medium` `High` | `low` `medium` `high` |
+  | Running Speed | `Soft` `Medium` `Max` | `soft` `medium` `max` |
+  | Cleaning Method | `Clean water` `Detergent` | `clean_water` `detergent` |
+  | MAX Mode: Spray Volume | `Rinse` `Max` | `rinse` `max` |
+  | Water Mode: Spray Volume | `Mist` `Wet` `Medium` `Rinse` `Max` | `mist` `wet` `medium` `rinse` `max` |
+
+  Watt options (`90W`/`120W`/`150W`) and the values sent to the device are
+  unchanged. Entity names and entity IDs are unchanged. The UI still shows
+  "Low", "Rinse" and so on, now translated into the Home Assistant language.
+
 ### Fixed
 - Issue #35: sensors no longer go **unavailable** the moment the device drops
   offline. Because every entity subclassed `CoordinatorEntity` with no custom
@@ -31,8 +51,31 @@ Two rules for contributors:
   Home Assistant core, so hassfest forbids custom integrations from listing it
   in their manifest. The library is still provided by HA at runtime, so there
   is no behavior change.
+- Issue #36: on devices that report no tank fields (Floor One S5
+  `FW103000US`, Floor One S5 Combo), the fresh-water tank sensor was stuck on
+  `full` and the waste-water tank sensor on `clean`. Both values were
+  hard-coded fallbacks, not readings: these models' `gci` payload carries none
+  of `e1`/`e2`/`e3`/`wp`. Both tank sensors now report **unknown** when no tank
+  signal is present, and still decode `e2`/`e3`/`wp`/`e1` exactly as before on
+  models that send them.
+- Issue #37: removed the `DC lookup SSL error` / `retrying DC lookup without
+  SSL verification` warnings logged on every start and reload. The datacenter
+  lookup host `api-base.robotww.ecouser.net` presents a certificate signed by
+  a private "ECOVACS CA" (SSL Labs grade T), so the verified first attempt
+  could never succeed. The lookup is now a single, deliberately unverified
+  request without the `InsecureRequestWarning`. It sends only the region code,
+  and its answer is accepted only if it names one of the four known
+  datacenters (`cn`/`as`/`na`/`eu`). All other traffic, including login and
+  device control, is still certificate-verified.
+- Translations for the waste-water tank listed a `dirty` state that the sensor
+  never reports, so `full` was shown untranslated. The fresh-water tank and
+  brush-roller states had no translations at all. All enum sensor states are
+  now translated in every language.
 
 ### Added
+- French translation (`fr.json`) covering the config flow, options, sensors,
+  selects and binary sensors (#40).
+- Select option labels translated in English, Spanish and French (#40).
 - Release guardrails encoding lessons from past releases:
   - `scripts/check_release_consistency.py` verifies manifest version is valid
     semver, `documentation`/`issue_tracker` URLs point at this repo, the README
@@ -43,6 +86,12 @@ Two rules for contributors:
     stable release tag is an ancestor of `main` (pre-releases exempt).
   - `tests/test_release_consistency.py` exercises the guard logic and fails if
     the checked-in metadata drifts.
+
+## [v2.4.3] - 2026-07-29
+
+### Fixed
+- Blocking calls on the Home Assistant event loop during startup: the IoT datacenter lookup is now lazy and all client calls run via `hass.async_add_executor_job`.
+- Region was ignored when an entity re-created its API client; the configured region is now preserved.
 
 ## [v2.4.2] - 2026-06-02
 

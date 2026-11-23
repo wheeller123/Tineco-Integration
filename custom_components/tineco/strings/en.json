@@ -70,7 +70,74 @@
         "name": "Waste Water Tank Status",
         "state": {
           "clean": "Clean",
-          "dirty": "Dirty"
+          "full": "Full"
+        }
+      },
+      "fresh_water_tank_status": {
+        "name": "Fresh Water Tank Status",
+        "state": {
+          "empty": "Empty",
+          "full": "Full"
+        }
+      },
+      "brush_roller": {
+        "name": "Brush Roller",
+        "state": {
+          "normal": "Normal",
+          "tangled": "Tangled",
+          "stuck": "Stuck",
+          "needs_cleaning": "Needs cleaning"
+        }
+      }
+    },
+    "select": {
+      "volume_level": {
+        "name": "Sound: Volume Level",
+        "state": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
+      "running_speed": {
+        "name": "Running Speed",
+        "state": {
+          "soft": "Soft",
+          "medium": "Medium",
+          "max": "Max"
+        }
+      },
+      "cleaning_method": {
+        "name": "Cleaning Method",
+        "state": {
+          "clean_water": "Clean water",
+          "detergent": "Detergent"
+        }
+      },
+      "suction_power": {
+        "name": "Suction Mode: Power"
+      },
+      "max_power": {
+        "name": "MAX Mode: Power"
+      },
+      "max_spray_volume": {
+        "name": "MAX Mode: Spray Volume",
+        "state": {
+          "rinse": "Rinse",
+          "max": "Max"
+        }
+      },
+      "water_mode_power": {
+        "name": "Water Mode: Power"
+      },
+      "water_mode_spray_volume": {
+        "name": "Water Mode: Spray Volume",
+        "state": {
+          "mist": "Mist",
+          "wet": "Wet",
+          "medium": "Medium",
+          "rinse": "Rinse",
+          "max": "Max"
         }
       }
     },
