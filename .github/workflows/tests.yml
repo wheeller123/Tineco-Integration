@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -27,10 +27,8 @@ jobs:
           pip install homeassistant
 
       - name: Install test dependencies
-        # tzdata: older HA test harness (py3.11) uses "US/Pacific", a legacy
-        # zone name that newer Ubuntu runner images no longer ship.
         run: |
-          pip install pytest pytest-asyncio pytest-homeassistant-custom-component tzdata
+          pip install pytest pytest-asyncio pytest-homeassistant-custom-component
 
       - name: Run tests
         run: |
