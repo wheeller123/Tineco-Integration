@@ -38,6 +38,15 @@ Two rules for contributors:
   of `e1`/`e2`/`e3`/`wp`. Both tank sensors now report **unknown** when no tank
   signal is present, and still decode `e2`/`e3`/`wp`/`e1` exactly as before on
   models that send them.
+- Issue #37: removed the `DC lookup SSL error` / `retrying DC lookup without
+  SSL verification` warnings logged on every start and reload. The datacenter
+  lookup host `api-base.robotww.ecouser.net` presents a certificate signed by
+  a private "ECOVACS CA" (SSL Labs grade T), so the verified first attempt
+  could never succeed. The lookup is now a single, deliberately unverified
+  request without the `InsecureRequestWarning`. It sends only the region code,
+  and its answer is accepted only if it names one of the four known
+  datacenters (`cn`/`as`/`na`/`eu`). All other traffic, including login and
+  device control, is still certificate-verified.
 
 ### Added
 - Release guardrails encoding lessons from past releases:

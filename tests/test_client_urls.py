@@ -11,9 +11,12 @@ first read of ``dc`` / ``IOT_API_BASE`` / ``IOT_LOGIN_ENDPOINT`` (see
 """
 from __future__ import annotations
 
-from unittest.mock import patch
+import logging
+import warnings
+from unittest.mock import MagicMock, patch
 
 import pytest
+from urllib3.exceptions import InsecureRequestWarning
 
 from custom_components.tineco.tineco_client_impl import TinecoClient
 
@@ -134,3 +137,35 @@ def test_cn_endpoints_use_cn_vendor(offline_dc_lookup):
     """CN builds ``dc-cn.cn`` hosts; WW builds ``dc-<dc>.ww``."""
     assert "dc-cn.cn.ecouser.net" in TinecoClient(region="CN").IOT_LOGIN_ENDPOINT
     assert "dc-eu.ww.ecouser.net" in TinecoClient(region="IE").IOT_LOGIN_ENDPOINT
+
+
+def _dc_response(payload, status=200):
+    resp = MagicMock(status_code=status, text=str(payload))
+    resp.json.return_value = payload
+    return resp
+
+
+def test_dc_lookup_is_single_unverified_request_without_warnings(caplog, recwarn):
+    """Issue #37: api-base.robotww.ecouser.net uses a private CA, so the lookup
+    is one deliberate unverified request - no failing verified attempt, no
+    SSL/retry warnings in the log and no InsecureRequestWarning."""
+    with patch("custom_components.tineco.tineco_client_impl.requests.Session.get") as get:
+        def _get(*args, **kwargs):
+            # Mimic urllib3, which warns on every unverified HTTPS request.
+            warnings.warn("Unverified HTTPS request", InsecureRequestWarning)
+            return _dc_response({"code": 0, "data": {"dc": "eu"}})
+        get.side_effect = _get
+        with caplog.at_level(logging.DEBUG, logger="custom_components.tineco"):
+            assert TinecoClient(region="IT")._resolve_iot_datacenter() == "eu"
+
+    assert get.call_count == 1
+    assert get.call_args.kwargs["verify"] is False
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert not [w for w in recwarn if issubclass(w.category, InsecureRequestWarning)]
+
+
+def test_dc_lookup_rejects_unknown_dc_and_falls_back():
+    """An unverified answer is only trusted if it names a known datacenter."""
+    with patch("custom_components.tineco.tineco_client_impl.requests.Session.get") as get:
+        get.return_value = _dc_response({"code": 0, "data": {"dc": "evil.example.com"}})
+        assert TinecoClient(region="US")._resolve_iot_datacenter() == "na"
