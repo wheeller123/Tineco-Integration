@@ -27,8 +27,10 @@ jobs:
           pip install homeassistant
 
       - name: Install test dependencies
+        # tzdata: older HA test harness (py3.11) uses "US/Pacific", a legacy
+        # zone name that newer Ubuntu runner images no longer ship.
         run: |
-          pip install pytest pytest-asyncio pytest-homeassistant-custom-component
+          pip install pytest pytest-asyncio pytest-homeassistant-custom-component tzdata
 
       - name: Run tests
         run: |
