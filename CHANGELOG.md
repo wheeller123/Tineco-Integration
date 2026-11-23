@@ -44,6 +44,12 @@ Two rules for contributors:
   - `tests/test_release_consistency.py` exercises the guard logic and fails if
     the checked-in metadata drifts.
 
+## [v2.4.3] - 2026-07-29
+
+### Fixed
+- Blocking calls on the Home Assistant event loop during startup: the IoT datacenter lookup is now lazy and all client calls run via `hass.async_add_executor_job`.
+- Region was ignored when an entity re-created its API client; the configured region is now preserved.
+
 ## [v2.4.2] - 2026-06-02
 
 ### Fixed
