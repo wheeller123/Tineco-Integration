@@ -13,6 +13,18 @@ Two rules for contributors:
 
 ## [Unreleased]
 
+### Fixed
+- **Sound: Enabled** switch snapped back to **on** a few seconds after every
+  mute. The mute command writes `ms`, but the state was read back from `vl`
+  (the volume level, which muting never changes), so the next poll always
+  reported the sound as on, even though the device was actually muted. The
+  switch now reads the mute status the device reports in `msr`
+  (1 = muted, 0 = sound on, from `gci` or `cfp`), verified on a Floor One S9
+  Artist Premium. If neither payload has `msr`, the switch keeps its last
+  state. The diagnostic scripts (`interactive_full_test.py`,
+  `test_tineco_data.py`) read `msr` too, and the interactive test no longer
+  swaps the mute and unmute values of `ms`.
+
 ## [v2.5.0] - 2026-11-23
 
 ### Breaking changes
