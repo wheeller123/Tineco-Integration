@@ -19,6 +19,13 @@ DOMAIN = "tineco"
 # but silently does nothing, so we detect the capability instead. (#33)
 LED_FIELD = "led"
 
+# Mute state as the device reports it: ``msr`` echoes the last ``ms`` command
+# (1 = muted, 0 = sound on). Verified on a Floor One S9 Artist Premium
+# (CL2343c-04): ``{'ms': 0}`` flips ``msr`` 1 -> 0 in both ``gci`` and ``cfp``,
+# ``{'ms': 1}`` flips it back, while ``vl`` (volume level, 1-3 or 4) never
+# changes. Reading ``vl`` made the switch snap back to "on" after every mute.
+MUTE_FIELD = "msr"
+
 
 def _gci_payload(info) -> Optional[Dict]:
     """Return the ``gci`` payload from coordinator data, or ``None``.
@@ -46,6 +53,22 @@ def led_supported(info) -> Optional[bool]:
     if payload is None:
         return None
     return LED_FIELD in payload
+
+
+def sound_enabled(info) -> Optional[bool]:
+    """Whether the device sound is on, read from the reported mute state.
+
+    Checks ``gci`` first, then ``cfp`` (both carry ``msr``). Returns ``None``
+    when neither payload reports it, so the caller keeps its last state
+    instead of guessing.
+    """
+    if not isinstance(info, dict):
+        return None
+    for key in ("gci", "cfp"):
+        payload = info.get(key)
+        if isinstance(payload, dict) and MUTE_FIELD in payload:
+            return payload[MUTE_FIELD] == 0
+    return None
 
 
 async def async_setup_entry(
@@ -322,22 +345,11 @@ class TinecoAudioSwitch(TinecoBaseSwitch):
             stored = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
             coordinator = stored.get("coordinator")
             
-            if coordinator and coordinator.data:
-                # Get current sound state from coordinator data
-                info = coordinator.data
-                
-                # Check gci or cfp for vl (voice level) field
-                payload = None
-                if isinstance(info, dict):
-                    if 'gci' in info and isinstance(info['gci'], dict):
-                        payload = info['gci']
-                    elif 'cfp' in info and isinstance(info['cfp'], dict):
-                        payload = info['cfp']
-                
-                if payload and 'vl' in payload:
-                    # vl = 1 means sound on, vl = 0 means sound off/muted
-                    self._state = payload['vl'] >= 1
-                    
+            if coordinator is not None:
+                enabled = sound_enabled(coordinator.data)
+                if enabled is not None:
+                    self._state = enabled
+
         except Exception as err:
             _LOGGER.debug(f"Error updating sound switch: {err}")
 

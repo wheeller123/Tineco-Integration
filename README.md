@@ -271,7 +271,9 @@ Device queries used by the integration:
 - `e1` — legacy single-value waste-tank fallback (`e1 > 0`) on older firmware
 - `vs` — online flag
 - `vl` — volume level (1=Low, 2=Medium, 3=High)
-- `ms` — mute status (0=unmuted, 1=muted)
+- `ms` — mute **command** (write only: 1=mute, 0=unmute)
+- `msr` — mute **status** as reported by the device (1=muted, 0=sound on);
+  echoes the last `ms` command in both `gci` and `cfp`
 
 
 ## Troubleshooting

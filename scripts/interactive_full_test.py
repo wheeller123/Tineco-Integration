@@ -403,24 +403,20 @@ def section_sound(ctx: Ctx) -> int:
     section("Sound — API mute / unmute round-trip")
     failures = 0
 
-    info("Sending control_device({'ms': 0}) (mute)...")
-    ctx.control({"ms": 0})
-    time.sleep(2.0)
-    info_dict = ctx.fetch()
-    vl = gci(info_dict).get("vl")
-    info(f"gci.vl after mute command = {vl}  (1=on, 0=off; behaviour varies by model)")
-
-    info("Sending control_device({'ms': 1}) (unmute)...")
+    # ``ms`` 1 = mute, 0 = unmute; the device echoes the state back in ``msr``.
+    info("Sending control_device({'ms': 1}) (mute)...")
     ctx.control({"ms": 1})
     time.sleep(2.0)
-    info_dict = ctx.fetch()
-    vl_after = gci(info_dict).get("vl")
-    info(f"gci.vl after unmute command = {vl_after}")
+    msr = gci(ctx.fetch()).get("msr")
+    if not report(f"gci.msr = {msr} after mute command (expected 1)", msr == 1):
+        failures += 1
 
-    if vl == vl_after:
-        info(_c("vl did not change between mute / unmute — sound may not be controllable on this model.", YELLOW))
-    else:
-        report("sound state changed in response to ms commands", True)
+    info("Sending control_device({'ms': 0}) (unmute)...")
+    ctx.control({"ms": 0})
+    time.sleep(2.0)
+    msr_after = gci(ctx.fetch()).get("msr")
+    if not report(f"gci.msr = {msr_after} after unmute command (expected 0)", msr_after == 0):
+        failures += 1
 
     return failures
 

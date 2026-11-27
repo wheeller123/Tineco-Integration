@@ -426,10 +426,10 @@ def test_tineco_data():
     print("\n📢 Current volume/mute state:")
     for endpoint_key in ['gci', 'cfp']:
         if endpoint_key in info and isinstance(info[endpoint_key], dict):
-            if 'vl' in info[endpoint_key]:
-                vl_value = info[endpoint_key]['vl']
-                state = "ON (Unmuted)" if vl_value == 1 else "OFF (Muted)"
-                print(f"    {endpoint_key}.vl: {vl_value} → {state}")
+            if 'msr' in info[endpoint_key]:
+                msr_value = info[endpoint_key]['msr']
+                state = "OFF (Muted)" if msr_value == 1 else "ON (Unmuted)"
+                print(f"    {endpoint_key}.msr: {msr_value} → {state}")
     
     # Test volume control - automatically send ms=0
     print("\n🔧 Testing volume control with {'ms': 0}...")
@@ -457,10 +457,10 @@ def test_tineco_data():
             print("\n📢 Updated volume/mute state:")
             for endpoint_key in ['gci', 'cfp']:
                 if endpoint_key in updated_info and isinstance(updated_info[endpoint_key], dict):
-                    if 'vl' in updated_info[endpoint_key]:
-                        vl_value = updated_info[endpoint_key]['vl']
-                        state = "ON (Unmuted)" if vl_value == 1 else "OFF (Muted)"
-                        print(f"    {endpoint_key}.vl: {vl_value} → {state}")
+                    if 'msr' in updated_info[endpoint_key]:
+                        msr_value = updated_info[endpoint_key]['msr']
+                        state = "OFF (Muted)" if msr_value == 1 else "ON (Unmuted)"
+                        print(f"    {endpoint_key}.msr: {msr_value} → {state}")
     else:
         print("\n❌ Command failed - no response received")
 
